@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.library.mapper.SysBookMapper">
+
+    <resultMap type="com.ruoyi.library.domain.SysBook" id="SysBookResult">
+        <result property="bookId"    column="book_id"    />
+        <result property="parentId"    column="parent_id"    />
+        <result property="ancestors"    column="ancestors"    />
+        <result property="bookName"    column="book_name"    />
+        <result property="orderNum"    column="order_num"    />
+        <result property="author"    column="author"    />
+        <result property="price"    column="price"    />
+        <result property="status"    column="status"    />
+        <result property="category"    column="category"    />
+        <result property="coverUrl"    column="cover_url"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+        <collection property="sysBookChapterList" notNullColumn="sub_chapter_id" javaType="java.util.List" resultMap="SysBookChapterResult" />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.library.domain.SysBookChapter" id="SysBookChapterResult">
+        <result property="chapterId"    column="sub_chapter_id"    />
+        <result property="bookId"    column="sub_book_id"    />
+        <result property="chapterTitle"    column="sub_chapter_title"    />
+        <result property="orderNum"    column="sub_order_num"    />
+        <result property="contentSummary"    column="sub_content_summary"    />
+    </resultMap>
+
+    <sql id="selectBookVo">
+        select a.book_id, a.parent_id, a.ancestors, a.book_name, a.order_num, a.author, a.price, a.status, a.category, a.cover_url, a.create_by, a.create_time, a.update_by, a.update_time, a.remark,
+               b.chapter_id as sub_chapter_id, b.book_id as sub_book_id, b.chapter_title as sub_chapter_title, b.order_num as sub_order_num, b.content_summary as sub_content_summary
+        from sys_book a
+        left join sys_book_chapter b on b.book_id = a.book_id
+    </sql>
+
+    <select id="selectBookList" parameterType="com.ruoyi.library.domain.SysBook" resultMap="SysBookResult">
+        <include refid="selectBookVo"/>
+        <where>
+            <if test="bookName != null  and bookName != ''"> and a.book_name like concat('%', #{bookName}, '%')</if>
+            <if test="author != null  and author != ''"> and a.author like concat('%', #{author}, '%')</if>
+            <if test="status != null  and status != ''"> and a.status = #{status}</if>
+            <if test="category != null  and category != ''"> and a.category = #{category}</if>
+            <if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
+                AND date_format(a.create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
+                AND date_format(a.create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
+            </if>
+            <!-- 数据范围过滤 -->
+            ${params.dataScope}
+        </where>
+        order by a.parent_id, a.order_num
+    </select>
+
+    <select id="selectBookByBookId" parameterType="Long" resultMap="SysBookResult">
+        <include refid="selectBookVo"/>
+        where a.book_id = #{bookId}
+    </select>
+
+    <insert id="insertBook" parameterType="com.ruoyi.library.domain.SysBook" useGeneratedKeys="true" keyProperty="bookId">
+        insert into sys_book
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="parentId != null">parent_id,</if>
+            <if test="ancestors != null">ancestors,</if>
+            <if test="bookName != null and bookName != ''">book_name,</if>
+            <if test="orderNum != null">order_num,</if>
+            <if test="author != null">author,</if>
+            <if test="price != null">price,</if>
+            <if test="status != null">status,</if>
+            <if test="category != null">category,</if>
+            <if test="coverUrl != null">cover_url,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="parentId != null">#{parentId},</if>
+            <if test="ancestors != null">#{ancestors},</if>
+            <if test="bookName != null and bookName != ''">#{bookName},</if>
+            <if test="orderNum != null">#{orderNum},</if>
+            <if test="author != null">#{author},</if>
+            <if test="price != null">#{price},</if>
+            <if test="status != null">#{status},</if>
+            <if test="category != null">#{category},</if>
+            <if test="coverUrl != null">#{coverUrl},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateBook" parameterType="com.ruoyi.library.domain.SysBook">
+        update sys_book
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="ancestors != null">ancestors = #{ancestors},</if>
+            <if test="bookName != null and bookName != ''">book_name = #{bookName},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="author != null">author = #{author},</if>
+            <if test="price != null">price = #{price},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="category != null">category = #{category},</if>
+            <if test="coverUrl != null">cover_url = #{coverUrl},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where book_id = #{bookId}
+    </update>
+
+    <delete id="deleteBookByBookId" parameterType="Long">
+        delete from sys_book where book_id = #{bookId}
+    </delete>
+
+    <delete id="deleteBookByBookIds" parameterType="String">
+        delete from sys_book where book_id in
+        <foreach item="bookId" collection="array" open="(" separator="," close=")">
+            #{bookId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteSysBookChapterByBookIds" parameterType="String">
+        delete from sys_book_chapter where book_id in
+        <foreach item="bookId" collection="array" open="(" separator="," close=")">
+            #{bookId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteSysBookChapterByBookId" parameterType="Long">
+        delete from sys_book_chapter where book_id = #{bookId}
+    </delete>
+
+    <insert id="batchSysBookChapter">
+        insert into sys_book_chapter( chapter_id, book_id, chapter_title, order_num, content_summary) values
+		<foreach item="item" index="index" collection="list" separator=",">
+            ( #{item.chapterId}, #{item.bookId}, #{item.chapterTitle}, #{item.orderNum}, #{item.contentSummary})
+        </foreach>
+    </insert>
+
+    <select id="selectBookChildren" parameterType="Long" resultMap="SysBookResult">
+        select * from sys_book where find_in_set(#{bookId}, ancestors)
+    </select>
+
+    <update id="updateBookChildren" parameterType="java.util.List">
+        update sys_book set ancestors =
+        <foreach collection="list" item="item" index="index"
+                 separator=" " open="case book_id" close="end">
+            when #{item.bookId} then #{item.ancestors}
+        </foreach>
+        where book_id in
+        <foreach collection="list" item="item" index="index"
+                 separator="," open="(" close=")">
+            #{item.bookId}
+        </foreach>
+    </update>
+
+    <select id="countChildBookByBookId" parameterType="Long" resultType="Integer">
+        select count(1) from sys_book where parent_id = #{bookId}
+    </select>
+</mapper>
