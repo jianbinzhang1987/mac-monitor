@@ -1,0 +1,24 @@
+[package]
+name = "network-procotol-stack"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+# TCP/IP Stack
+smoltcp = { version = "0.11", features = ["std", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-udp"] }
+# TLS / Crypto
+rustls = "0.23"
+rcgen = "0.12" # Certificate generation
+ring = "0.17"
+# Utilities
+log = "0.4"
+base64 = "0.22"
+httparse = "1.8"
+lazy_static = "1.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+interprocess = "1.1"
+chrono = { version = "0.4", features = ["serde"] }

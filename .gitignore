@@ -1,3 +1,19 @@
 clash-verge-rev-dev/
 文档资料/
 .DS_Store
+
+# Rust
+target/
+
+# Node
+node_modules/
+dist/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# IDE & System
+.idea/
+.vscode/
+*.swp
+*.swo

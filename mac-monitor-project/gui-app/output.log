@@ -1,0 +1,217 @@
+
+> mac-monitor-gui@0.1.0 tauri
+> tauri dev
+
+     Running BeforeDevCommand (`npm run dev`)
+
+> mac-monitor-gui@0.1.0 dev
+> vite
+
+
+  VITE v5.4.21  ready in 243 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+        Info Watching /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri for changes...
+[1m[92m   Compiling[0m mac-monitor-gui-core v0.1.0 (/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri)
+[1m[96m    Building[0m [=======================> ] 420/422: mac-monitor-gui-core(build) [1m[96m    Building[0m [=======================> ] 421/422: mac-monitor-gui-core(bin)   [K[1m[92m    Finished[0m ]8;;https://doc.rust-lang.org/cargo/reference/profiles.html#default-profiles\`dev` profile [unoptimized + debuginfo]]8;;\ target(s) in 4.32s
+[1m[92m     Running[0m `target/debug/mac-monitor-gui-core`
+
+thread 'main' (1699806) panicked at src/main.rs:89:5:
+there is no reactor running, must be called from the context of a Tokio 1.x runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:698:5
+   1: core::panicking::panic_fmt
+             at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic_display
+             at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/panicking.rs:264:5
+   3: tokio::task::spawn::spawn_inner
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.49.0/src/task/spawn.rs:207:23
+   4: tokio::task::spawn::spawn
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.49.0/src/task/spawn.rs:178:13
+   5: mac_monitor_gui_core::start_heartbeat_loop
+             at ./src/main.rs:89:5
+   6: mac_monitor_gui_core::main::{{closure}}
+             at ./src/main.rs:119:13
+   7: core::ops::function::FnOnce::call_once{{vtable.shim}}
+             at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/ops/function.rs:250:5
+   8: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/alloc/src/boxed.rs:2005:9
+   9: tauri::app::setup
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.9.5/src/app.rs:2382:5
+  10: tauri::app::App<R>::make_run_event_loop_callback::{{closure}}
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.9.5/src/app.rs:1300:25
+  11: tauri_runtime_wry::handle_event_loop
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-wry-2.9.3/src/lib.rs:3997:7
+  12: tauri_runtime_wry::make_event_handler::{{closure}}
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-wry-2.9.3/src/lib.rs:3143:5
+  13: <tao::platform_impl::platform::app_state::EventLoopHandler<T> as tao::platform_impl::platform::app_state::EventHandler>::handle_nonuser_event::{{closure}}
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/app_state.rs:105:9
+  14: tao::platform_impl::platform::app_state::EventLoopHandler<T>::with_callback
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/app_state.rs:79:7
+  15: <tao::platform_impl::platform::app_state::EventLoopHandler<T> as tao::platform_impl::platform::app_state::EventHandler>::handle_nonuser_event
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/app_state.rs:100:10
+  16: tao::platform_impl::platform::app_state::Handler::handle_nonuser_event
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/app_state.rs:208:20
+  17: tao::platform_impl::platform::app_state::AppState::launched
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/app_state.rs:304:13
+  18: tao::platform_impl::platform::app_delegate::did_finish_launching
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/app_delegate.rs:128:3
+  19: <unknown>
+  20: <unknown>
+  21: <unknown>
+  22: <unknown>
+  23: <unknown>
+  24: <unknown>
+  25: <unknown>
+  26: <unknown>
+  27: <unknown>
+  28: <unknown>
+  29: <unknown>
+  30: <unknown>
+  31: <unknown>
+  32: <unknown>
+  33: <unknown>
+  34: <unknown>
+  35: <unknown>
+  36: <unknown>
+  37: <() as objc2::encode::EncodeArguments>::__invoke
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.3/src/encode.rs:433:26
+  38: objc2::runtime::message_receiver::msg_send_primitive::send
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.3/src/runtime/message_receiver.rs:172:18
+  39: objc2::runtime::message_receiver::MessageReceiver::send_message
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.3/src/runtime/message_receiver.rs:432:38
+  40: <MethodFamily as objc2::__macro_helpers::msg_send_retained::MsgSend<Receiver,Return>>::send_message
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.3/src/__macro_helpers/msg_send_retained.rs:35:28
+  41: tao::platform_impl::platform::event_loop::EventLoop<T>::run_return
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/event_loop.rs:234:16
+  42: tao::platform_impl::platform::event_loop::EventLoop<T>::run
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/event_loop.rs:201:26
+  43: tao::event_loop::EventLoop<T>::run
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/event_loop.rs:214:21
+  44: <tauri_runtime_wry::Wry<T> as tauri_runtime::Runtime<T>>::run
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-wry-2.9.3/src/lib.rs:3087:21
+  45: tauri::app::App<R>::run
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.9.5/src/app.rs:1249:8
+  46: tauri::app::Builder<R>::run
+             at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.9.5/src/app.rs:2301:26
+  47: mac_monitor_gui_core::main
+             at ./src/main.rs:123:10
+  48: core::ops::function::FnOnce::call_once
+             at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+thread 'main' (1699806) panicked at library/core/src/panicking.rs:230:5:
+panic in a function that cannot unwind
+stack backtrace:
+   0:        0x1056cae9e - std::backtrace_rs::backtrace::libunwind::trace::hdf24bbc40d90cab9
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/../../backtrace/src/backtrace/libunwind.rs:117:9
+   1:        0x1056cae9e - std::backtrace_rs::backtrace::trace_unsynchronized::hd73fc4794a242b29
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/../../backtrace/src/backtrace/mod.rs:66:14
+   2:        0x1056cae9e - std::sys::backtrace::_print_fmt::h56e295d0fbf92b5b
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/sys/backtrace.rs:66:9
+   3:        0x1056cae9e - <std::sys::backtrace::BacktraceLock::print::DisplayBacktrace as core::fmt::Display>::fmt::hde20aac7c5b209d4
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/sys/backtrace.rs:39:26
+   4:        0x1056dc62f - core::fmt::rt::Argument::fmt::hfcef3a27232158b5
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/fmt/rt.rs:173:76
+   5:        0x1056dc62f - core::fmt::write::hb40f84478aa94947
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/fmt/mod.rs:1469:25
+   6:        0x10569bec2 - std::io::default_write_fmt::h44c98f6da59a265f
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/io/mod.rs:639:11
+   7:        0x10569bec2 - std::io::Write::write_fmt::h45c5032d22f6a52a
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/io/mod.rs:1954:13
+   8:        0x1056a5572 - std::sys::backtrace::BacktraceLock::print::h624ba515ee42db46
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/sys/backtrace.rs:42:9
+   9:        0x1056a9644 - std::panicking::default_hook::{{closure}}::hcd0d8eda8ad11a72
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:301:27
+  10:        0x1056a94b9 - std::panicking::default_hook::h831fad149bd387e2
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:328:9
+  11:        0x1056a9df0 - std::panicking::panic_with_hook::he279b1ed12881c5d
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:834:13
+  12:        0x1056a9ac5 - std::panicking::panic_handler::{{closure}}::h0c2f47016e5ca1d7
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:700:13
+  13:        0x1056a56a9 - std::sys::backtrace::__rust_end_short_backtrace::h3c88a03cee16a842
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/sys/backtrace.rs:174:18
+  14:        0x105692e44 - __rustc[d9b87f19e823c0ef]::rust_begin_unwind
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:698:5
+  15:        0x105716a64 - core::panicking::panic_nounwind_fmt::runtime::hd90db4c6914b21cb
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/panicking.rs:122:22
+  16:        0x105716a64 - core::panicking::panic_nounwind_fmt::hd642507177360d37
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/intrinsics/mod.rs:2435:9
+  17:        0x10571698a - core::panicking::panic_nounwind::h96f8a52144e13bcb
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/panicking.rs:230:5
+  18:        0x105716ba5 - core::panicking::panic_cannot_unwind::h25fbd5d21a3902c9
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/panicking.rs:342:5
+  19:        0x1050d4109 - tao::platform_impl::platform::app_delegate::did_finish_launching::h72e2311d8db467e5
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/app_delegate.rs:126:1
+  20:     0x7ff816685b9c - <unknown>
+  21:     0x7ff816711342 - <unknown>
+  22:     0x7ff816711297 - <unknown>
+  23:     0x7ff816655fdb - <unknown>
+  24:     0x7ff8177800fd - <unknown>
+  25:     0x7ff81a0fd332 - <unknown>
+  26:     0x7ff81a0fd07b - <unknown>
+  27:     0x7ff81a0fb119 - <unknown>
+  28:     0x7ff81a0fad69 - <unknown>
+  29:     0x7ff8177a8c81 - <unknown>
+  30:     0x7ff8177a8a95 - <unknown>
+  31:     0x7ff81df16d8e - <unknown>
+  32:     0x7ff81df165f1 - <unknown>
+  33:     0x7ff81df0fee6 - <unknown>
+  34:     0x7ff8220ec095 - <unknown>
+  35:     0x7ff81a0f40e2 - <unknown>
+  36:     0x7ff81ab82137 - <unknown>
+  37:     0x7ff81a0e4e99 - <unknown>
+  38:        0x105273530 - <() as objc2::encode::EncodeArguments>::__invoke::h0318008fb88bd386
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.3/src/encode.rs:433:26
+  39:        0x105277a30 - objc2::runtime::message_receiver::msg_send_primitive::send::h686c2abcc6e23981
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.3/src/runtime/message_receiver.rs:172:18
+  40:        0x10526cc90 - objc2::runtime::message_receiver::MessageReceiver::send_message::h190e80d699792197
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.3/src/runtime/message_receiver.rs:432:38
+  41:        0x104bd6527 - <MethodFamily as objc2::__macro_helpers::msg_send_retained::MsgSend<Receiver,Return>>::send_message::h39aaa0de5371ce1d
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.3/src/__macro_helpers/msg_send_retained.rs:35:28
+  42:        0x104de1af3 - tao::platform_impl::platform::event_loop::EventLoop<T>::run_return::h14e62255614de369
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/event_loop.rs:234:16
+  43:        0x104de2061 - tao::platform_impl::platform::event_loop::EventLoop<T>::run::h539d5e4450060f76
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/platform_impl/macos/event_loop.rs:201:26
+  44:        0x104c3662d - tao::event_loop::EventLoop<T>::run::h08b5143414aa5410
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/event_loop.rs:214:21
+  45:        0x104df865c - <tauri_runtime_wry::Wry<T> as tauri_runtime::Runtime<T>>::run::h247a3f5c578a73e4
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-wry-2.9.3/src/lib.rs:3087:21
+  46:        0x104bc9d77 - tauri::app::App<R>::run::h50899be45a8e9bd7
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.9.5/src/app.rs:1249:8
+  47:        0x104bca3cf - tauri::app::Builder<R>::run::ha95e4013bc5f703d
+                               at /Users/adolf/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.9.5/src/app.rs:2301:26
+  48:        0x104be5551 - mac_monitor_gui_core::main::ha53c3f421efd40db
+                               at /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/src/main.rs:123:10
+  49:        0x104c03e0e - core::ops::function::FnOnce::call_once::h978741a1ed8d78ea
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/ops/function.rs:250:5
+  50:        0x104c8ed61 - std::sys::backtrace::__rust_begin_short_backtrace::hf1aa4ec1bf160d54
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/sys/backtrace.rs:158:18
+  51:        0x104cce814 - std::rt::lang_start::{{closure}}::h7a90df90c4d9fefa
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/rt.rs:206:18
+  52:        0x10569d6f5 - core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once::hf3ac46c438c11a2e
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/ops/function.rs:287:21
+  53:        0x10569d6f5 - std::panicking::catch_unwind::do_call::h23b5400e9699d0e5
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:590:40
+  54:        0x10569d6f5 - std::panicking::catch_unwind::h455f28d6fd492edc
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:553:19
+  55:        0x10569d6f5 - std::panic::catch_unwind::hfd8b99ae711af814
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panic.rs:359:14
+  56:        0x10569d6f5 - std::rt::lang_start_internal::{{closure}}::hd633c016c2fbfa9f
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/rt.rs:175:24
+  57:        0x10569d6f5 - std::panicking::catch_unwind::do_call::h68b3f7dc5c3e0f1e
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:590:40
+  58:        0x10569d6f5 - std::panicking::catch_unwind::h9d1581b2521a3be8
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panicking.rs:553:19
+  59:        0x10569d6f5 - std::panic::catch_unwind::h44c0363dfb2d6acc
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/panic.rs:359:14
+  60:        0x10569d6f5 - std::rt::lang_start_internal::hba06c43da98f3f80
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/rt.rs:171:5
+  61:        0x104cce7f7 - std::rt::lang_start::h7435522ed018aea3
+                               at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/rt.rs:205:5
+  62:        0x104be58a8 - _main
+  63:     0x7ff816202530 - <unknown>
+thread caused non-unwinding panic. aborting.
