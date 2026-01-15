@@ -1,4 +1,4 @@
-use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
+use sqlx::{sqlite::SqliteConnectOptions, Row, SqlitePool};
 use std::str::FromStr;
 use crate::models::{AuditLog, BehaviorLog, ScreenshotLog};
 
@@ -20,23 +20,20 @@ impl Database {
     }
 
     async fn init(&self) -> Result<(), sqlx::Error> {
-        // 创建审计日志表
+        // 创建审计日志表 (流量日志)
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS audit_logs (
                 id TEXT PRIMARY KEY,
-                pin_number TEXT,
+                cpe_id TEXT,
                 url TEXT,
                 req_time TEXT,
-                resp_time TEXT,
                 method_type TEXT,
+                domain TEXT,
+                process_name TEXT,
+                risk_level INTEGER,
                 ip TEXT,
                 mac TEXT,
-                cpe_id TEXT,
                 host_id TEXT,
-                status_code TEXT,
-                request_body TEXT,
-                response_body TEXT,
-                title TEXT,
                 is_uploaded INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
@@ -48,13 +45,11 @@ impl Database {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 proc TEXT,
                 op_time TEXT,
-                pin TEXT,
-                op_file TEXT,
-                op_type TEXT,
-                op_ret TEXT,
-                op_reason TEXT,
-                host_id TEXT,
                 cpe_id TEXT,
+                op_type TEXT,
+                detail TEXT,
+                risk_level INTEGER,
+                host_id TEXT,
                 mac TEXT,
                 ip TEXT,
                 is_uploaded INTEGER DEFAULT 0,
@@ -66,16 +61,14 @@ impl Database {
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS screenshot_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pin TEXT,
                 capture_time TEXT,
-                app_name TEXT,
-                window_title TEXT,
-                image_path TEXT,
-                image_hash TEXT,
-                is_sensitive INTEGER,
-                ocr_text TEXT,
-                host_id TEXT,
                 cpe_id TEXT,
+                image_path TEXT,
+                ocr_text TEXT,
+                risk_level INTEGER,
+                app_name TEXT,
+                image_hash TEXT,
+                host_id TEXT,
                 mac TEXT,
                 ip TEXT,
                 is_uploaded INTEGER DEFAULT 0,
@@ -98,23 +91,20 @@ impl Database {
 
     pub async fn save_audit_log(&self, log: &AuditLog) -> Result<(), sqlx::Error> {
         sqlx::query(
-            "INSERT INTO audit_logs (id, pin_number, url, req_time, resp_time, method_type, ip, mac, cpe_id, host_id, status_code, request_body, response_body, title)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO audit_logs (id, cpe_id, url, req_time, method_type, domain, process_name, risk_level, ip, mac, host_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&log.id)
-        .bind(&log.pin_number)
+        .bind(&log.cpe_id)
         .bind(&log.url)
         .bind(&log.req_time)
-        .bind(&log.resp_time)
         .bind(&log.method_type)
+        .bind(&log.domain)
+        .bind(&log.process_name)
+        .bind(log.risk_level)
         .bind(&log.ip)
         .bind(&log.mac)
-        .bind(&log.cpe_id)
         .bind(&log.host_id)
-        .bind(&log.status_code)
-        .bind(&log.request_body)
-        .bind(&log.response_body)
-        .bind(&log.title)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -122,18 +112,16 @@ impl Database {
 
     pub async fn save_behavior_log(&self, log: &BehaviorLog) -> Result<(), sqlx::Error> {
         sqlx::query(
-            "INSERT INTO behavior_logs (proc, op_time, pin, op_file, op_type, op_ret, op_reason, host_id, cpe_id, mac, ip)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO behavior_logs (proc, op_time, cpe_id, op_type, detail, risk_level, host_id, mac, ip)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&log.proc)
         .bind(&log.op_time)
-        .bind(&log.pin)
-        .bind(&log.op_file)
-        .bind(&log.op_type)
-        .bind(&log.op_ret)
-        .bind(&log.op_reason)
-        .bind(&log.host_id)
         .bind(&log.cpe_id)
+        .bind(&log.op_type)
+        .bind(&log.detail)
+        .bind(log.risk_level)
+        .bind(&log.host_id)
         .bind(&log.mac)
         .bind(&log.ip)
         .execute(&self.pool)
@@ -143,19 +131,17 @@ impl Database {
 
     pub async fn save_screenshot_log(&self, log: &ScreenshotLog) -> Result<(), sqlx::Error> {
         sqlx::query(
-            "INSERT INTO screenshot_logs (pin, capture_time, app_name, window_title, image_path, image_hash, is_sensitive, ocr_text, host_id, cpe_id, mac, ip)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO screenshot_logs (capture_time, cpe_id, image_path, ocr_text, risk_level, app_name, image_hash, host_id, mac, ip)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
-        .bind(&log.pin)
         .bind(&log.capture_time)
-        .bind(&log.app_name)
-        .bind(&log.window_title)
-        .bind(&log.image_path)
-        .bind(&log.image_hash)
-        .bind(log.is_sensitive as i32)
-        .bind(&log.ocr_text)
-        .bind(&log.host_id)
         .bind(&log.cpe_id)
+        .bind(&log.image_path)
+        .bind(&log.ocr_text)
+        .bind(log.risk_level)
+        .bind(&log.app_name)
+        .bind(&log.image_hash)
+        .bind(&log.host_id)
         .bind(&log.mac)
         .bind(&log.ip)
         .execute(&self.pool)
@@ -164,57 +150,147 @@ impl Database {
     }
 
     pub async fn get_unsent_audit_logs(&self) -> Result<Vec<AuditLog>, sqlx::Error> {
-        sqlx::query_as!(
-            AuditLog,
-            "SELECT pin_number, id, url, req_time, resp_time, method_type, ip, mac, cpe_id, host_id, status_code, request_body, response_body, title FROM audit_logs WHERE is_uploaded = 0 LIMIT 10"
+        let rows = sqlx::query(
+            r#"SELECT
+                cpe_id,
+                id,
+                url,
+                req_time,
+                method_type,
+                domain,
+                process_name,
+                risk_level,
+                ip,
+                mac,
+                host_id
+            FROM audit_logs WHERE is_uploaded = 0 LIMIT 10"#
         )
         .fetch_all(&self.pool)
-        .await
+        .await?;
+
+        let mut logs = Vec::with_capacity(rows.len());
+        for row in rows {
+            logs.push(AuditLog {
+                cpe_id: row.try_get("cpe_id")?,
+                id: row.try_get("id")?,
+                url: row.try_get("url")?,
+                req_time: row.try_get("req_time")?,
+                method_type: row.try_get("method_type")?,
+                domain: row.try_get("domain")?,
+                process_name: row.try_get("process_name")?,
+                risk_level: row.try_get("risk_level")?,
+                ip: row.try_get("ip")?,
+                mac: row.try_get("mac")?,
+                host_id: row.try_get("host_id")?,
+            });
+        }
+        Ok(logs)
     }
 
     pub async fn mark_audit_log_sent(&self, id: &str) -> Result<(), sqlx::Error> {
-        sqlx::query!("UPDATE audit_logs SET is_uploaded = 1 WHERE id = ?", id)
+        sqlx::query("UPDATE audit_logs SET is_uploaded = 1 WHERE id = ?")
+            .bind(id)
             .execute(&self.pool)
             .await?;
         Ok(())
     }
 
     pub async fn get_unsent_behavior_logs(&self) -> Result<Vec<BehaviorLog>, sqlx::Error> {
-        sqlx::query_as!(
-            BehaviorLog,
-            "SELECT proc, op_time, pin, op_file, op_type, op_ret, op_reason, host_id, cpe_id, mac, ip FROM behavior_logs WHERE is_uploaded = 0 LIMIT 10"
+        let rows = sqlx::query(
+            r#"SELECT
+                id,
+                proc,
+                op_time,
+                cpe_id,
+                op_type,
+                detail,
+                risk_level,
+                host_id,
+                mac,
+                ip
+            FROM behavior_logs WHERE is_uploaded = 0 LIMIT 10"#
         )
         .fetch_all(&self.pool)
-        .await
+        .await?;
+
+        let mut logs = Vec::with_capacity(rows.len());
+        for row in rows {
+            logs.push(BehaviorLog {
+                id: Some(row.try_get::<i64, _>("id")?),
+                proc: row.try_get("proc")?,
+                op_time: row.try_get("op_time")?,
+                cpe_id: row.try_get("cpe_id")?,
+                op_type: row.try_get("op_type")?,
+                detail: row.try_get("detail")?,
+                risk_level: row.try_get("risk_level")?,
+                host_id: row.try_get("host_id")?,
+                mac: row.try_get("mac")?,
+                ip: row.try_get("ip")?,
+            });
+        }
+        Ok(logs)
     }
 
     pub async fn mark_behavior_log_sent(&self, id: i64) -> Result<(), sqlx::Error> {
-        sqlx::query!("UPDATE behavior_logs SET is_uploaded = 1 WHERE id = ?", id)
+        sqlx::query("UPDATE behavior_logs SET is_uploaded = 1 WHERE id = ?")
+            .bind(id)
             .execute(&self.pool)
             .await?;
         Ok(())
     }
 
     pub async fn get_unsent_screenshot_logs(&self) -> Result<Vec<ScreenshotLog>, sqlx::Error> {
-        sqlx::query_as!(
-            ScreenshotLog,
-            "SELECT pin, capture_time, app_name, window_title, image_path, image_hash, is_sensitive, ocr_text, host_id, cpe_id, mac, ip FROM screenshot_logs WHERE is_uploaded = 0 LIMIT 5"
+        let rows = sqlx::query(
+            r#"SELECT
+                id,
+                capture_time,
+                cpe_id,
+                image_path,
+                ocr_text,
+                risk_level,
+                app_name,
+                image_hash,
+                host_id,
+                mac,
+                ip
+            FROM screenshot_logs WHERE is_uploaded = 0 LIMIT 5"#
         )
         .fetch_all(&self.pool)
-        .await
+        .await?;
+
+        let mut logs = Vec::with_capacity(rows.len());
+        for row in rows {
+            logs.push(ScreenshotLog {
+                id: Some(row.try_get::<i64, _>("id")?),
+                capture_time: row.try_get("capture_time")?,
+                cpe_id: row.try_get("cpe_id")?,
+                image_path: row.try_get("image_path")?,
+                ocr_text: row.try_get::<Option<String>, _>("ocr_text")?,
+                risk_level: row.try_get("risk_level")?,
+                app_name: row.try_get("app_name")?,
+                image_hash: row.try_get("image_hash")?,
+                host_id: row.try_get("host_id")?,
+                mac: row.try_get("mac")?,
+                ip: row.try_get("ip")?,
+            });
+        }
+        Ok(logs)
     }
 
     pub async fn mark_screenshot_log_sent(&self, hash: &str) -> Result<(), sqlx::Error> {
-        sqlx::query!("UPDATE screenshot_logs SET is_uploaded = 1 WHERE image_hash = ?", hash)
+        sqlx::query("UPDATE screenshot_logs SET is_uploaded = 1 WHERE image_hash = ?")
+            .bind(hash)
             .execute(&self.pool)
             .await?;
         Ok(())
     }
 
     pub async fn check_screenshot_exists(&self, hash: &str) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query!("SELECT COUNT(*) as count FROM screenshot_logs WHERE image_hash = ?", hash)
+        let row = sqlx::query("SELECT COUNT(*) as count FROM screenshot_logs WHERE image_hash = ?")
+            .bind(hash)
             .fetch_one(&self.pool)
             .await?;
-        Ok(result.count > 0)
+        let count: i64 = row.try_get("count")?;
+        Ok(count > 0)
     }
 }

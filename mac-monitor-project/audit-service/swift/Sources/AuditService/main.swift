@@ -2,27 +2,26 @@ import Foundation
 
 print("🚀 Audit Service Launcher Initializing...")
 
-// Mock all FFI functions
-@_silgen_name("log_audit_event")
-public func log_audit_event(_ event_json: UnsafePointer<Int8>) {
-    let str = String(cString: event_json)
-    print("📝 [MOCK FFI] log_audit_event: \(str)")
-}
-
-@_silgen_name("export_root_ca_pem")
-public func export_root_ca_pem() -> UnsafePointer<Int8>? {
-    print("📝 [MOCK FFI] export_root_ca_pem called")
-    return nil
-}
+// FFI functions are defined in FFI.swift
 
 // Start non-ES services only (without EndpointSecurity)
 func startAuditServices() {
     print("🛡 Starting Audit Services (non-ES mode)...")
-    
+
+    // Initialize Rust Core (Starts Scanner and Sync Service)
+    rust_init_audit_core()
+
     // Start IPC Server
     AuditIPCServer.shared.start()
     
-    print("✅ Audit IPC Server started")
+    // Start Screen Capturer (if macOS 12.3+)
+    if #available(macOS 12.3, *) {
+        ScreenCapturer.shared.start()
+    } else {
+        print("⚠️ Screen Capture requires macOS 12.3+")
+    }
+    
+    print("✅ Audit Services started")
     print("📍 Socket location: /tmp/mac_monitor_audit.sock")
 }
 

@@ -9,6 +9,8 @@ import com.ruoyi.monitor.domain.MonitorDevice;
 import com.ruoyi.monitor.domain.MonitorPolicy;
 import com.ruoyi.monitor.service.IMonitorDeviceService;
 import com.ruoyi.monitor.service.IMonitorPolicyService;
+import com.ruoyi.common.config.RuoYiConfig;
+import com.ruoyi.common.utils.file.FileUploadUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,7 +31,7 @@ public class ApiMonitorController extends BaseController {
 
     @Autowired
     private IMonitorDeviceService monitorDeviceService;
-    
+
     @Autowired
     private IMonitorPolicyService monitorPolicyService;
 
@@ -63,7 +65,8 @@ public class ApiMonitorController extends BaseController {
         // 获取该设备对应的生效策略版本
         MonitorPolicy effectivePolicy = getEffectivePolicy(device.getSerialNumber());
         String policyVersion = (effectivePolicy != null && effectivePolicy.getVersion() != null)
-                             ? String.valueOf(effectivePolicy.getVersion()) : "0";
+                ? String.valueOf(effectivePolicy.getVersion())
+                : "0";
 
         Map<String, Object> data = new HashMap<>();
         data.put("token", token);
@@ -87,7 +90,8 @@ public class ApiMonitorController extends BaseController {
         // 查询该设备对应的生效策略
         MonitorPolicy effectivePolicy = getEffectivePolicy(device.getSerialNumber());
         String serverPolicyVersion = (effectivePolicy != null && effectivePolicy.getVersion() != null)
-                                   ? String.valueOf(effectivePolicy.getVersion()) : "0";
+                ? String.valueOf(effectivePolicy.getVersion())
+                : "0";
 
         // 更新最后心跳时间
         exist.setLastHeartbeat(new java.util.Date());
@@ -148,21 +152,64 @@ public class ApiMonitorController extends BaseController {
         return AjaxResult.success(data);
     }
 
+    @Autowired
+    private com.ruoyi.monitor.service.IMonitorLogTrafficService monitorLogTrafficService;
+
+    @Autowired
+    private com.ruoyi.monitor.service.IMonitorLogBehaviorService monitorLogBehaviorService;
+
+    @Autowired
+    private com.ruoyi.monitor.service.IMonitorLogScreenshotService monitorLogScreenshotService;
+
     /**
-     * 4. 日志上报
+     * 4. 流量/审计日志上报
      */
-    @PostMapping("/log/upload")
-    public AjaxResult uploadLog(@RequestParam(required = false) MultipartFile file, 
-                                @RequestParam(required = false) String logJson) {
-        // 如果有图片文件 (截图日志)
-        if (file != null && !file.isEmpty()) {
-            // TODO: 保存文件到 OSS 或本地磁盘
-            // String filePath = FileUploadUtils.upload(file);
-        }
-        
-        // 解析 logJson 并入库 (monitor_log_traffic / monitor_log_screenshot)
-        // LogService.saveLog(logJson);
-        
+    @PostMapping("/log/audit")
+    public AjaxResult uploadAuditLog(@RequestBody com.ruoyi.monitor.domain.MonitorLogTraffic log) {
+        monitorLogTrafficService.insertMonitorLogTraffic(log);
         return AjaxResult.success();
+    }
+
+    /**
+     * 5. 行为日志上报
+     */
+    @PostMapping("/log/behavior")
+    public AjaxResult uploadBehaviorLog(@RequestBody com.ruoyi.monitor.domain.MonitorLogBehavior log) {
+        monitorLogBehaviorService.insertMonitorLogBehavior(log);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 6. 截图日志上报
+     */
+    @PostMapping("/log/screenshot")
+    public AjaxResult uploadScreenshotLog(@RequestBody com.ruoyi.monitor.domain.MonitorLogScreenshot log) {
+        monitorLogScreenshotService.insertMonitorLogScreenshot(log);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 7. 截图文件上传
+     */
+    @Anonymous
+    @PostMapping("/upload/screenshot")
+    public AjaxResult uploadScreenshot(MultipartFile file)
+    {
+        try
+        {
+            // 上传文件路径
+            String filePath = RuoYiConfig.getUploadPath();
+            // 上传并返回新文件名称 (返回格式如 /profile/upload/2026/01/15/xxx.jpg)
+            String fileName = FileUploadUtils.upload(filePath, file);
+
+            AjaxResult ajax = AjaxResult.success();
+            ajax.put("url", fileName);
+            ajax.put("fileName", fileName);
+            return ajax;
+        }
+        catch (Exception e)
+        {
+            return AjaxResult.error(e.getMessage());
+        }
     }
 }

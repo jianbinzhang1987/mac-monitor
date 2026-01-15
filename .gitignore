@@ -20,3 +20,10 @@ clash-verge-rev-dev/
 **/*.swo
 **/*.log
 **/.build/
+
+# Database
+*.db
+*.rdb
+
+# Config
+config.json

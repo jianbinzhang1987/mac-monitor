@@ -3,57 +3,184 @@ pub mod db;
 pub mod uploader;
 pub mod clock;
 pub mod ipc;
+pub mod scanner;
 
 use std::ffi::CStr;
 use std::os::raw::c_char;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tokio::runtime::Runtime;
+use tokio::sync::OnceCell;
 use image::{ImageBuffer, Rgba, DynamicImage};
-use image::codecs::jpeg::JpegEncoder;
 use sha2::{Sha256, Digest};
 use std::io::Cursor;
 use chrono::Local;
 
 use crate::db::Database;
-use crate::models::{AuditLog, ScreenshotLog};
+use crate::models::{AuditLog, ScreenshotLog, BehaviorLog};
 use crate::uploader::Uploader;
 use crate::uploader::sync::SyncService;
 use crate::clock::LogicalClock;
 use crate::ipc::IpcServer;
+use serde::Deserialize;
+use std::fs;
+
+#[derive(Debug, Deserialize)]
+struct Config {
+    server: ServerConfig,
+    storage: StorageConfig,
+}
+
+#[derive(Debug, Deserialize)]
+struct ServerConfig {
+    url: String,
+    app_code: String,
+    app_secret: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct StorageConfig {
+    screenshot_dir: String,
+    database_path: String,
+}
 
 lazy_static::lazy_static! {
     static ref RUNTIME: Runtime = Runtime::new().expect("Failed to create Tokio runtime");
-    static ref SERVICE_CONTEXT: Arc<ServiceContext> = setup_context();
 }
+
+static SERVICE_CONTEXT: OnceCell<Arc<ServiceContext>> = OnceCell::const_new();
 
 struct ServiceContext {
     db: Arc<Database>,
     uploader: Arc<Uploader>,
     clock: Arc<LogicalClock>,
+    config: Config,
+    policy: Arc<RwLock<models::PolicyConfig>>,
 }
 
-fn setup_context() -> Arc<ServiceContext> {
-    RUNTIME.block_on(async {
-        let db = Database::new("sqlite:audit.db").await.expect("Failed to init DB");
-        let uploader = Arc::new(Uploader::new("APP_CODE", "APP_SECRET", "https://api.example.com"));
-        let clock = Arc::new(LogicalClock::new());
+async fn init_service_context() -> Arc<ServiceContext> {
+    // 1. 加载配置
+    let config_path = "/Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/config.json";
+    let config_str = fs::read_to_string(config_path).expect("Failed to read config.json");
+    let config: Config = serde_json::from_str(&config_str).expect("Failed to parse config.json");
 
-        let db_arc = Arc::new(db);
+    // 2. 初始化数据库
+    let _ = std::fs::create_dir_all(std::path::Path::new(&config.storage.database_path).parent().unwrap());
+    let db = Database::new(&format!("sqlite://{}", config.storage.database_path))
+        .await
+        .expect("Failed to init DB");
 
-        // 初始化背景同步服务
-        let sync_service = SyncService::new(db_arc.clone(), uploader.clone(), clock.clone());
-        sync_service.start();
+    // 3. 初始化上传器
+    let uploader = Arc::new(Uploader::new(
+        &config.server.app_code,
+        &config.server.app_secret,
+        &config.server.url
+    ));
 
-        // 启动 IPC 服务
-        let ipc_server = IpcServer::new(db_arc.clone(), uploader.clone(), RUNTIME.handle().clone());
-        ipc_server.start();
+    let clock = Arc::new(LogicalClock::new());
+    let db_arc = Arc::new(db);
 
-        Arc::new(ServiceContext {
-            db: db_arc,
-            uploader,
-            clock,
-        })
+    // 获取真实设备信息
+    let mut sys = sysinfo::System::new_all();
+    sys.refresh_all();
+
+    let host_name = sysinfo::System::host_name().unwrap_or_else(|| "Unknown-Mac".to_string());
+    let mac_addr = mac_address::get_mac_address()
+        .unwrap_or(None)
+        .map(|m| m.to_string())
+        .unwrap_or_else(|| "00:00:00:00:00:00".to_string());
+
+    let ip_addr = get_local_ip();
+    let serial_number = get_macos_serial_number();
+
+    let device_info = models::DeviceInfo {
+        pin: serial_number,
+        host_id: host_name.clone(),
+        cpe_id: format!("CPE-{}", host_name),
+        mac: mac_addr,
+        ip: ip_addr,
+    };
+
+    // 初始化默认策略
+    let policy = Arc::new(RwLock::new(models::PolicyConfig {
+        process_blacklist: vec!["clash".to_string(), "v2ray".to_string(), "clash-meta".to_string(), "proxyman".to_string()],
+        app_blacklist: vec!["clash".to_string(), "v2ray".to_string(), "proxyman".to_string()],
+    }));
+
+    // 4. 初始化背景同步服务
+    let sync_service = SyncService::new(
+        db_arc.clone(),
+        uploader.clone(),
+        clock.clone(),
+        policy.clone(),
+        device_info
+    );
+    sync_service.start();
+
+    // 5. 启动 IPC 服务
+    let ipc_server = IpcServer::new(db_arc.clone(), uploader.clone(), RUNTIME.handle().clone());
+    ipc_server.start();
+
+    Arc::new(ServiceContext {
+        db: db_arc,
+        uploader,
+        clock,
+        config,
+        policy,
     })
+}
+
+fn get_macos_serial_number() -> String {
+    use std::process::Command;
+    let output = Command::new("ioreg")
+        .args(&["-c", "IOPlatformExpertDevice", "-d", "2"])
+        .output();
+
+    match output {
+        Ok(o) => {
+            let s = String::from_utf8_lossy(&o.stdout);
+            for line in s.lines() {
+                if line.contains("IOPlatformSerialNumber") {
+                    let parts: Vec<&str> = line.split('=').collect();
+                    if parts.len() == 2 {
+                        return parts[1].trim().trim_matches(|c| c == '"' || c == ' ').to_string();
+                    }
+                }
+            }
+        },
+        Err(e) => log::error!("Failed to execute ioreg: {}", e),
+    }
+    "UNKNOWN_SERIAL".to_string()
+}
+
+fn get_local_ip() -> String {
+    use std::net::UdpSocket;
+    // 尝试连接到一个公共 IP (不会实际发送数据包) 来确定使用的本地接口 IP
+    match UdpSocket::bind("0.0.0.0:0") {
+        Ok(socket) => {
+            if let Ok(_) = socket.connect("8.8.8.8:80") {
+                if let Ok(addr) = socket.local_addr() {
+                    return addr.ip().to_string();
+                }
+            }
+        },
+        Err(e) => log::error!("Failed to bind UDP socket for IP detection: {}", e),
+    }
+    "127.0.0.1".to_string()
+}
+
+async fn get_service_context() -> Arc<ServiceContext> {
+    SERVICE_CONTEXT
+        .get_or_init(|| async { init_service_context().await })
+        .await
+        .clone()
+}
+
+#[no_mangle]
+pub extern "C" fn init_audit_core() {
+    RUNTIME.spawn(async {
+        let _ = get_service_context().await;
+        log::info!("Audit Logic Core initialized successfully");
+    });
 }
 
 #[no_mangle]
@@ -66,7 +193,14 @@ pub extern "C" fn analyze_enhanced_image(
     is_sensitive: bool,
     ocr_text: *const c_char
 ) {
+    eprintln!(
+        "analyze_enhanced_image called: len={}, width={}, height={}",
+        len,
+        width,
+        height
+    );
     if ptr.is_null() || len == 0 {
+        eprintln!("analyze_enhanced_image: null ptr or zero len");
         return;
     }
 
@@ -87,10 +221,55 @@ pub extern "C" fn analyze_enhanced_image(
     let data_vec = raw_data.to_vec();
 
     RUNTIME.spawn(async move {
-        let ctx = &SERVICE_CONTEXT;
+        let ctx = get_service_context().await;
 
         // 1. 构建 ImageBuffer (Swift 传过来的是 RGBA)
-        let img: Option<ImageBuffer<Rgba<u8>, _>> = ImageBuffer::from_raw(width, height, data_vec);
+        let width_usize = width as usize;
+        let height_usize = height as usize;
+        let expected_row_bytes = width_usize.saturating_mul(4);
+        if expected_row_bytes == 0 || height_usize == 0 {
+            log::error!("Invalid image size: {}x{}", width, height);
+            return;
+        }
+        if data_vec.len() < expected_row_bytes.saturating_mul(height_usize) {
+            log::error!(
+                "Buffer too small: len={}, expected at least {}",
+                data_vec.len(),
+                expected_row_bytes * height_usize
+            );
+            return;
+        }
+        if data_vec.len() % height_usize != 0 {
+            log::error!(
+                "Unexpected buffer size: len={}, height={}",
+                data_vec.len(),
+                height_usize
+            );
+            return;
+        }
+        let bytes_per_row = data_vec.len() / height_usize;
+        if bytes_per_row < expected_row_bytes {
+            log::error!(
+                "Row stride too small: bytes_per_row={}, expected_row_bytes={}",
+                bytes_per_row,
+                expected_row_bytes
+            );
+            return;
+        }
+        let packed_data = if bytes_per_row == expected_row_bytes {
+            data_vec
+        } else {
+            let mut packed = vec![0u8; expected_row_bytes * height_usize];
+            for row in 0..height_usize {
+                let src_start = row * bytes_per_row;
+                let dst_start = row * expected_row_bytes;
+                packed[dst_start..dst_start + expected_row_bytes]
+                    .copy_from_slice(&data_vec[src_start..src_start + expected_row_bytes]);
+            }
+            packed
+        };
+        let img: Option<ImageBuffer<Rgba<u8>, _>> =
+            ImageBuffer::from_raw(width, height, packed_data);
 
         if let Some(image_buffer) = img {
             let dynamic_image = DynamicImage::ImageRgba8(image_buffer);
@@ -115,30 +294,34 @@ pub extern "C" fn analyze_enhanced_image(
             let mut cursor = Cursor::new(&mut jpeg_data);
             // 设置 80% 质量
             if let Err(e) = dynamic_image.write_to(&mut cursor, image::ImageFormat::Jpeg) {
-                log::error!("Failed to encode image to JPEG: {}", e);
+                eprintln!("Failed to encode image to JPEG: {}", e);
                 return;
             }
 
             // 5. 保存图片到本地
             let filename = format!("{}.jpg", hash_string);
-            let save_path = format!("audit_images/{}", filename);
-            let _ = std::fs::create_dir_all("audit_images");
+            let save_dir = "/Users/adolf/Desktop/mac-monitor/screenshots";
+            let save_path = format!("{}/{}", save_dir, filename);
+            if let Err(e) = std::fs::create_dir_all(save_dir) {
+                eprintln!("Failed to create screenshot dir {}: {}", save_dir, e);
+                return;
+            }
 
             if let Err(e) = std::fs::write(&save_path, &jpeg_data) {
-                log::error!("Failed to save image file: {}", e);
+                eprintln!("Failed to save image file: {}", e);
                 return;
+            } else {
+                eprintln!("Screenshot written to {}", save_path);
             }
 
             // 6. 创建日志记录
             let log = ScreenshotLog {
                 id: None,
-                pin: "user_pin".to_string(), // TODO: 获取真实 PIN
-                capture_time: Local::now().to_rfc3339(),
+                capture_time: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                 app_name: app_name_str,
-                window_title: "Active Window".to_string(), // 未来可以传递更多窗口细节
-                image_path: save_path,
+                image_path: save_path.clone(),
                 image_hash: hash_string,
-                is_sensitive,
+                risk_level: if is_sensitive { 1 } else { 0 },
                 ocr_text: ocr_text_str,
                 host_id: "host_123".to_string(),
                 cpe_id: "cpe_123".to_string(),
@@ -147,10 +330,12 @@ pub extern "C" fn analyze_enhanced_image(
             };
 
             if let Err(e) = ctx.db.save_screenshot_log(&log).await {
-                log::error!("Failed to save screenshot log to DB: {}", e);
+                eprintln!("Failed to save screenshot log to DB: {}", e);
             } else {
-                log::info!("📸 Screenshot saved: {} (Sensitive: {})", log.app_name, is_sensitive);
+                eprintln!("📸 Screenshot saved: {} (Sensitive: {})", log.app_name, is_sensitive);
             }
+        } else {
+            eprintln!("Failed to build ImageBuffer from raw pixels");
         }
     });
 }
@@ -168,7 +353,7 @@ pub extern "C" fn log_audit_event(event_json: *const c_char) {
     };
 
     RUNTIME.spawn(async move {
-        let ctx = &SERVICE_CONTEXT;
+        let ctx = get_service_context().await;
         
         // 1. 先解析为通用的 Value 以判断类型
         let v: serde_json::Value = match serde_json::from_str(&r_str) {
@@ -188,7 +373,7 @@ pub extern "C" fn log_audit_event(event_json: *const c_char) {
                         if let Err(e) = ctx.db.save_behavior_log(&log).await {
                             log::error!("Failed to save behavior log: {}", e);
                         } else {
-                            log::info!("🛡 Behavior log saved: {} - {}", log.op_type, log.op_reason);
+                            log::info!("🛡 Behavior log saved: {} - {}", log.op_type, log.proc);
                         }
                     }
                     Err(e) => log::error!("Failed to parse BehaviorLog: {}", e),

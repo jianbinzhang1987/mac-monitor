@@ -13,8 +13,7 @@ import com.ruoyi.common.core.domain.BaseEntity;
  * @author ruoyi
  * @date 2026-01-15
  */
-public class MonitorLogScreenshot extends BaseEntity
-{
+public class MonitorLogScreenshot extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /** 日志ID */
@@ -26,100 +25,97 @@ public class MonitorLogScreenshot extends BaseEntity
 
     /** 设备序列号 */
     @Excel(name = "设备序列号")
+    @com.fasterxml.jackson.annotation.JsonProperty("cpe_id")
     private String serialNumber;
 
     /** 截图时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "截图时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @com.fasterxml.jackson.annotation.JsonProperty("capture_time")
     private Date captureTime;
 
     /** 文件路径 */
     @Excel(name = "文件路径")
+    @com.fasterxml.jackson.annotation.JsonProperty("image_path")
     private String filePath;
 
     /** OCR识别文本 */
     @Excel(name = "OCR识别文本")
+    @com.fasterxml.jackson.annotation.JsonProperty("ocr_text")
     private String ocrText;
 
     /** 风险等级(0-2) */
     @Excel(name = "风险等级(0-2)")
+    @com.fasterxml.jackson.annotation.JsonProperty("is_sensitive")
     private Integer riskLevel;
 
-    public void setLogId(Long logId) 
-    {
+    public void setLogId(Long logId) {
         this.logId = logId;
     }
 
-    public Long getLogId() 
-    {
+    public Long getLogId() {
         return logId;
     }
-    public void setDeviceId(Long deviceId) 
-    {
+
+    public void setDeviceId(Long deviceId) {
         this.deviceId = deviceId;
     }
 
-    public Long getDeviceId() 
-    {
+    public Long getDeviceId() {
         return deviceId;
     }
-    public void setSerialNumber(String serialNumber) 
-    {
+
+    public void setSerialNumber(String serialNumber) {
         this.serialNumber = serialNumber;
     }
 
-    public String getSerialNumber() 
-    {
+    public String getSerialNumber() {
         return serialNumber;
     }
-    public void setCaptureTime(Date captureTime) 
-    {
+
+    public void setCaptureTime(Date captureTime) {
         this.captureTime = captureTime;
     }
 
-    public Date getCaptureTime() 
-    {
+    public Date getCaptureTime() {
         return captureTime;
     }
-    public void setFilePath(String filePath) 
-    {
+
+    public void setFilePath(String filePath) {
         this.filePath = filePath;
     }
 
-    public String getFilePath() 
-    {
+    public String getFilePath() {
         return filePath;
     }
-    public void setOcrText(String ocrText) 
-    {
+
+    public void setOcrText(String ocrText) {
         this.ocrText = ocrText;
     }
 
-    public String getOcrText() 
-    {
+    public String getOcrText() {
         return ocrText;
     }
-    public void setRiskLevel(Integer riskLevel) 
-    {
+
+    public void setRiskLevel(Integer riskLevel) {
         this.riskLevel = riskLevel;
     }
 
-    public Integer getRiskLevel() 
-    {
+    public Integer getRiskLevel() {
         return riskLevel;
     }
 
     @Override
     public String toString() {
-        return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
-            .append("logId", getLogId())
-            .append("deviceId", getDeviceId())
-            .append("serialNumber", getSerialNumber())
-            .append("captureTime", getCaptureTime())
-            .append("filePath", getFilePath())
-            .append("ocrText", getOcrText())
-            .append("riskLevel", getRiskLevel())
-            .append("createTime", getCreateTime())
-            .toString();
+        return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
+                .append("logId", getLogId())
+                .append("deviceId", getDeviceId())
+                .append("serialNumber", getSerialNumber())
+                .append("captureTime", getCaptureTime())
+                .append("filePath", getFilePath())
+                .append("ocrText", getOcrText())
+                .append("riskLevel", getRiskLevel())
+                .append("createTime", getCreateTime())
+                .toString();
     }
 }

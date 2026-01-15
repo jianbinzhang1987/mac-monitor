@@ -186,7 +186,7 @@ pub extern "C" fn analyze_enhanced_image(
     // 实际生产中应配合 image 库保存 ptr 指向的像素数据为 JPG
     let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let filename = format!("{}_{}.jpg", app_name, timestamp.replace(" ", "_"));
-    let path = format!("/Library/Application Support/MacMonitor/screenshots/{}", filename);
+    let path = format!("/Users/adolf/Desktop/mac-monitor/screenshots/{}", filename);
 
     let log_json = serde_json::json!({
         "type": "screenshot",

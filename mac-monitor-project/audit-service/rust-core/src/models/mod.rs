@@ -2,23 +2,21 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuditLog {
-    pub pin_number: String,
+    #[serde(rename = "cpe_id")]
+    pub cpe_id: String,
     pub id: String,
     pub url: String,
+    #[serde(rename = "req_time")]
     pub req_time: String,
-    pub resp_time: String,
+    #[serde(rename = "method_type")]
     pub method_type: String,
+    pub domain: String,
+    #[serde(rename = "process_name")]
+    pub process_name: String,
+    pub risk_level: i32,
     pub ip: String,
     pub mac: String,
-    pub cpe_id: String,
     pub host_id: String,
-    pub status_code: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub request_body: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_body: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,44 +25,31 @@ pub struct BehaviorLog {
     pub id: Option<i64>,
     pub proc: String,
     pub op_time: String,
-    #[serde(default = "default_pin")]
-    pub pin: String,
-    #[serde(default = "default_string")]
-    pub op_file: String,
-    pub op_type: String, // 1 修改文件 2 完整性校验检查 3剪切板 4共享网络 5共享热点 6网络代理 7wlan设备插拔行为
-    pub op_ret: String,
-    pub op_reason: String,
-    #[serde(default = "default_host")]
-    pub host_id: String,
-    #[serde(default = "default_cpe")]
+    #[serde(rename = "cpe_id")]
     pub cpe_id: String,
-    #[serde(default = "default_mac")]
+    pub op_type: String,
+    pub detail: String,
+    pub risk_level: i32,
+    pub host_id: String,
     pub mac: String,
-    #[serde(default = "default_ip")]
     pub ip: String,
 }
-
-fn default_pin() -> String { "user_pin".to_string() }
-fn default_string() -> String { "".to_string() }
-fn default_host() -> String { "host_123".to_string() }
-fn default_cpe() -> String { "cpe_123".to_string() }
-fn default_mac() -> String { "00:00:00:00:00:00".to_string() }
-fn default_ip() -> String { "127.0.0.1".to_string() }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScreenshotLog {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<i64>,
-    pub pin: String,
     pub capture_time: String,
-    pub app_name: String,
-    pub window_title: String,
-    pub image_path: String, // 加密后的图片存储路径
-    pub image_hash: String, // 图片哈希值，用于去重
-    pub is_sensitive: bool, // 是否包含敏感信息（经过OCR检测）
-    pub ocr_text: Option<String>, // OCR识别的文本（仅用于敏感词匹配，不上报）
-    pub host_id: String,
+    #[serde(rename = "cpe_id")]
     pub cpe_id: String,
+    #[serde(rename = "image_path")]
+    pub image_path: String,
+    pub ocr_text: Option<String>,
+    #[serde(rename = "is_sensitive")]
+    pub risk_level: i32,
+    pub app_name: String,
+    pub image_hash: String,
+    pub host_id: String,
     pub mac: String,
     pub ip: String,
 }
@@ -76,4 +61,55 @@ pub struct DeviceInfo {
     pub cpe_id: String,
     pub mac: String,
     pub ip: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HeartbeatResponse {
+    pub server_logic_clock: Option<u64>,
+    pub server_time: Option<u64>,     // Sync field
+    #[serde(default)]
+    pub need_update: bool,            // Sync field
+    #[serde(default)]
+    pub commands: Vec<HeartbeatCommand>,        // Sync field
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HeartbeatCommand {
+    pub command_id: String,
+    pub op_type: String, // e.g., "reboot", "lock", "config"
+    pub payload: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PopNode {
+    pub pop_id: String,
+    pub name: String,
+    pub latency_hint: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateInfo {
+    pub has_update: bool,
+    pub version: Option<String>,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PolicyConfig {
+    #[serde(default)]
+    pub process_blacklist: Vec<String>,
+    #[serde(default)]
+    pub app_blacklist: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConfigResponse {
+    pub code: i32,
+    pub msg: String,
+    pub data: Option<PolicyConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CertInfo {
+    pub cert_pem: String,
 }

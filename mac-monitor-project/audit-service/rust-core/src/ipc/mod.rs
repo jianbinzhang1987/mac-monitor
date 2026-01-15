@@ -66,6 +66,7 @@ impl IpcServer {
                 Err(e) => IpcResponse {
                     status: "error".to_string(),
                     message: format!("Invalid JSON: {}", e),
+                    payload: None,
                 },
             };
 
@@ -86,6 +87,7 @@ impl IpcServer {
                 IpcResponse {
                     status: "ok".to_string(),
                     message: "Registration request accepted".to_string(),
+                    payload: None,
                 }
             }
             "login" => {
@@ -95,6 +97,7 @@ impl IpcServer {
                 IpcResponse {
                     status: "ok".to_string(),
                     message: format!("Login successful for {}", pin),
+                    payload: None,
                 }
             }
             "logout" => {
@@ -102,6 +105,7 @@ impl IpcServer {
                 IpcResponse {
                     status: "ok".to_string(),
                     message: "Logged out".to_string(),
+                    payload: None,
                 }
             }
             "get_pops" => {
