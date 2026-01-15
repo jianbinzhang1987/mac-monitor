@@ -1,15 +1,34 @@
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls::{ClientConfig, ServerConfig};
-use rcgen::{Certificate, CertificateParams, DistinguishedName, DnType, KeyPair};
-use std::collections::HashMap;
-use std::sync::Arc;
-use serde::Serialize;
+use crate::clock::LogicalClock;
+use chrono::{Local, TimeZone};
 use interprocess::local_socket::LocalSocketStream;
+use lazy_static::lazy_static;
+use rcgen::{Certificate, CertificateParams, DistinguishedName, DnType};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls::ServerConfig;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::Write;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-/// SSL MitM代理，用于拦截和审计HTTPS流量
+static LOG_COUNTER: AtomicU64 = AtomicU64::new(0);
+lazy_static! {
+    static ref GLOBAL_DEVICE_INFO: Mutex<DeviceInfo> = Mutex::new(DeviceInfo::default());
+    static ref GLOBAL_AUDIT_POLICY: Mutex<AuditPolicy> = Mutex::new(AuditPolicy::default());
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DeviceInfo {
+    pub pin_number: String,
+    pub ip: String,
+    pub mac: String,
+    pub cpe_id: String,
+    pub host_id: String,
+}
+
+/// SSL MitM 代理，用于拦截和审计 HTTPS 流量
 pub struct MitmProxy {
     root_ca: Certificate,
     cert_cache: HashMap<String, Arc<ServerConfig>>,
@@ -17,7 +36,6 @@ pub struct MitmProxy {
 
 impl MitmProxy {
     pub fn new() -> Self {
-        // 生成根CA证书
         let mut params = CertificateParams::default();
         params.distinguished_name = DistinguishedName::new();
         params.distinguished_name.push(DnType::CommonName, "Mac Monitor Root CA");
@@ -32,31 +50,26 @@ impl MitmProxy {
         }
     }
 
-    /// 获取根CA证书的PEM格式（用于安装到系统信任链）
+    /// 获取根 CA 证书 PEM（用于安装到系统信任链）
     pub fn get_root_ca_pem(&self) -> String {
         self.root_ca.serialize_pem().expect("Failed to serialize CA")
     }
 
     /// 为目标域名动态生成伪造证书
     pub fn generate_cert_for_domain(&mut self, domain: &str) -> Result<Arc<ServerConfig>> {
-        // 检查缓存
         if let Some(config) = self.cert_cache.get(domain) {
             return Ok(config.clone());
         }
 
-        // 生成新证书
         let mut params = CertificateParams::default();
         params.distinguished_name = DistinguishedName::new();
         params.distinguished_name.push(DnType::CommonName, domain);
-        params.subject_alt_names = vec![
-            rcgen::SanType::DnsName(domain.to_string()),
-        ];
+        params.subject_alt_names = vec![rcgen::SanType::DnsName(domain.to_string())];
 
         let cert = Certificate::from_params(params)?;
         let cert_der = cert.serialize_der()?;
         let key_der = cert.serialize_private_key_der();
 
-        // 构建ServerConfig
         let certs = vec![CertificateDer::from(cert_der)];
         let key = PrivateKeyDer::try_from(key_der)?;
 
@@ -71,65 +84,65 @@ impl MitmProxy {
         Ok(config_arc)
     }
 
-    /// 处理HTTPS连接的MitM逻辑
-    pub fn handle_https_connection(
-        &mut self,
-        domain: &str,
-        client_stream: &[u8],
-    ) -> Result<Vec<u8>> {
-        // 1. 获取或生成该域名的证书
+    /// 处理 HTTPS 连接的 MitM 逻辑（当前为简化版）
+    pub fn handle_https_connection(&mut self, domain: &str, client_stream: &[u8]) -> Result<Vec<u8>> {
         let _server_config = self.generate_cert_for_domain(domain)?;
+        let device_info = current_device_info();
 
-        // 2. 建立双向TLS连接
-        //    Client <--TLS--> Proxy <--TLS--> Server
-
-        // 3. 在内存中解密HTTP流量
-        //    解析HTTP请求/响应，提取敏感信息（URL、Headers、Body）
-
-        // 4. 根据审计规则判断是否记录、过滤或阻断
-
-        log::info!("MitM: Intercepting HTTPS traffic for domain: {}", domain);
-
-        // 构造模拟日志 (实际应从解析结果中获取)
-        let log = AuditLog {
-            timestamp: chrono::Local::now().timestamp(),
-            source_ip: "127.0.0.1".to_string(),
-            dest_ip: "0.0.0.0".to_string(),
-            domain: domain.to_string(),
-            url: format!("https://{}/", domain),
-            method: "GET".to_string(),
-            request_size: client_stream.len(),
-            response_size: 0,
-            status_code: 200,
+        let parsed = self.parse_http_request(client_stream).ok();
+        let (method, path, body) = if let Some(req) = parsed {
+            (req.method, req.path, req.body)
+        } else {
+            ("UNKNOWN".to_string(), "/".to_string(), Vec::new())
         };
 
-        // 发送日志到审计服务
+        let url = if path.starts_with("http://") || path.starts_with("https://") {
+            path.clone()
+        } else {
+            format!("https://{}{}", domain, path)
+        };
+
+        let req_time = format_logical_time(LogicalClock::now());
+        let resp_time = format_logical_time(LogicalClock::now());
+        let url = if path.starts_with("http://") || path.starts_with("https://") {
+            path.clone()
+        } else {
+            format!("https://{}{}", domain, path)
+        };
+
+        if !should_log_request(domain, &url) {
+            return Ok(client_stream.to_vec());
+        }
+
+        let log = AuditLog {
+            pin_number: device_info.pin_number,
+            id: next_log_id(),
+            url: url.clone(),
+            req_time,
+            resp_time,
+            method_type: method,
+            ip: device_info.ip,
+            mac: device_info.mac,
+            cpe_id: device_info.cpe_id,
+            host_id: device_info.host_id,
+            status_code: "200".to_string(),
+            request_body: if body.is_empty() {
+                None
+            } else {
+                Some(String::from_utf8_lossy(&body).to_string())
+            },
+            response_body: None,
+            title: None,
+        };
+
         if let Err(e) = self.send_log_to_service(&log) {
             log::error!("Failed to send log via IPC: {}", e);
         }
 
-        // 临时返回原始数据（实际应返回重新加密的数据）
         Ok(client_stream.to_vec())
     }
 
-    fn send_log_to_service(&self, log: &AuditLog) -> Result<()> {
-        let socket_path = "/tmp/mac_monitor_audit.sock";
-        let mut stream = LocalSocketStream::connect(socket_path)
-            .map_err(|e| format!("IPC Connect error: {}", e))?;
-
-        // 构造 IPC 消息格式
-        let command = serde_json::json!({
-            "command": "log_traffic",
-            "payload": log
-        });
-
-        let data = serde_json::to_string(&command)?;
-        stream.write_all(data.as_bytes())?;
-
-        Ok(())
-    }
-
-    /// 解析HTTP请求，提取审计所需信息
+    /// 解析 HTTP 请求，提取审计所需信息
     pub fn parse_http_request(&self, data: &[u8]) -> Result<HttpRequest> {
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut req = httparse::Request::new(&mut headers);
@@ -164,6 +177,93 @@ impl MitmProxy {
             _ => Err("Failed to parse HTTP request".into()),
         }
     }
+
+    fn send_log_to_service(&self, log: &AuditLog) -> Result<()> {
+        let socket_path = "/tmp/mac_monitor_audit.sock";
+        let mut stream = LocalSocketStream::connect(socket_path)
+            .map_err(|e| format!("IPC Connect error: {}", e))?;
+
+        let command = serde_json::json!({
+            "command": "log_traffic",
+            "payload": log
+        });
+
+        let data = serde_json::to_string(&command)?;
+        stream.write_all(data.as_bytes())?;
+
+        Ok(())
+    }
+}
+
+fn next_log_id() -> String {
+    let seq = LOG_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{}-{}", LogicalClock::now_ms(), seq)
+}
+
+pub fn set_device_info(info: DeviceInfo) {
+    let mut current = GLOBAL_DEVICE_INFO.lock().unwrap();
+    *current = info;
+}
+
+fn current_device_info() -> DeviceInfo {
+    GLOBAL_DEVICE_INFO.lock().unwrap().clone()
+}
+
+pub fn set_audit_policy_json(json: &str) -> Result<()> {
+    let policy: AuditPolicy = serde_json::from_str(json)?;
+    let mut current = GLOBAL_AUDIT_POLICY.lock().unwrap();
+    *current = policy;
+    Ok(())
+}
+
+fn should_log_request(domain: &str, url: &str) -> bool {
+    let policy = GLOBAL_AUDIT_POLICY.lock().unwrap();
+    if policy.white_domains.is_empty() {
+        return true;
+    }
+    let domain_lower = domain.to_ascii_lowercase();
+    for entry in &policy.white_domains {
+        let item = entry.domain.trim().to_ascii_lowercase();
+        if item.is_empty() {
+            continue;
+        }
+        if domain_lower == item || domain_lower.ends_with(&format!(".{}", item)) {
+            return false;
+        }
+    }
+    let _ = url;
+    true
+}
+
+pub fn response_body_for_url(url: &str, body: &[u8]) -> Option<String> {
+    if body.is_empty() {
+        return None;
+    }
+    let policy = GLOBAL_AUDIT_POLICY.lock().unwrap();
+    for config in &policy.website_rsp_config_array {
+        if config.url.is_empty() {
+            continue;
+        }
+        if url.contains(&config.url) {
+            let max_len = config.rspbodylength;
+            let slice = if max_len > 0 && body.len() > max_len {
+                &body[..max_len]
+            } else {
+                body
+            };
+            return Some(String::from_utf8_lossy(slice).to_string());
+        }
+    }
+    None
+}
+
+fn format_logical_time(timestamp_secs: i64) -> String {
+    Local
+        .timestamp_opt(timestamp_secs, 0)
+        .single()
+        .unwrap_or_else(Local::now)
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -177,13 +277,44 @@ pub struct HttpRequest {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AuditLog {
-    pub timestamp: i64,
-    pub source_ip: String,
-    pub dest_ip: String,
-    pub domain: String,
+    pub pin_number: String,
+    pub id: String,
     pub url: String,
-    pub method: String,
-    pub request_size: usize,
-    pub response_size: usize,
-    pub status_code: u16,
+    pub req_time: String,
+    pub resp_time: String,
+    pub method_type: String,
+    pub ip: String,
+    pub mac: String,
+    pub cpe_id: String,
+    pub host_id: String,
+    pub status_code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+struct AuditPolicy {
+    #[serde(default)]
+    white_domains: Vec<WhiteDomain>,
+    #[serde(default)]
+    website_rsp_config_array: Vec<ResponseConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct WhiteDomain {
+    domain: String,
+    #[serde(default)]
+    id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ResponseConfig {
+    #[serde(default)]
+    rspbodylength: usize,
+    #[serde(default)]
+    url: String,
 }

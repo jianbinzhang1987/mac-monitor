@@ -41,7 +41,7 @@ fn setup_context() -> Arc<ServiceContext> {
         let db_arc = Arc::new(db);
 
         // 初始化背景同步服务
-        let sync_service = SyncService::new(db_arc.clone(), uploader.clone());
+        let sync_service = SyncService::new(db_arc.clone(), uploader.clone(), clock.clone());
         sync_service.start();
 
         // 启动 IPC 服务
@@ -57,30 +57,39 @@ fn setup_context() -> Arc<ServiceContext> {
 }
 
 #[no_mangle]
-pub extern "C" fn analyze_image_buffer(
+pub extern "C" fn analyze_enhanced_image(
     ptr: *const u8,
     len: usize,
     width: u32,
-    height: u32
+    height: u32,
+    app_name: *const c_char,
+    is_sensitive: bool,
+    ocr_text: *const c_char
 ) {
     if ptr.is_null() || len == 0 {
         return;
     }
 
-    let raw_data = unsafe { std::slice::from_raw_parts(ptr, len) };
+    // 转换 FFI 字符串
+    let app_name_str = if !app_name.is_null() {
+        unsafe { CStr::from_ptr(app_name).to_string_lossy().into_owned() }
+    } else {
+        "Unknown".to_string()
+    };
 
-    // 我们需要克隆数据，因为 FFI 指针指向的内存在函数返回后可能无效
-    // 或者我们直接在当前线程处理（但这会阻塞 Swift UI/Main 线程，所以最好 spawn 任务）
+    let ocr_text_str = if !ocr_text.is_null() {
+        Some(unsafe { CStr::from_ptr(ocr_text).to_string_lossy().into_owned() })
+    } else {
+        None
+    };
+
+    let raw_data = unsafe { std::slice::from_raw_parts(ptr, len) };
     let data_vec = raw_data.to_vec();
 
     RUNTIME.spawn(async move {
         let ctx = &SERVICE_CONTEXT;
 
-        // 1. 构建 ImageBuffer
-        // 注意：Swift 传递的是 BGRA 格式，image crate 默认处理 RGBA
-        // 这里假设 Swift 端传递的是原始字节，我们需要正确转换
-        // 如果是 BGRA，我们需要在这里进行通道交换，或者在保存时处理
-        // 为了简化，这里假设数据可以直接被 ImageBuffer 加载 (可能颜色会反转，但在审计场景可接受，或者稍后修复)
+        // 1. 构建 ImageBuffer (Swift 传过来的是 RGBA)
         let img: Option<ImageBuffer<Rgba<u8>, _>> = ImageBuffer::from_raw(width, height, data_vec);
 
         if let Some(image_buffer) = img {
@@ -95,25 +104,24 @@ pub extern "C" fn analyze_image_buffer(
             // 3. 检查数据库是否存在相同哈希
             if let Ok(exists) = ctx.db.check_screenshot_exists(&hash_string).await {
                 if exists {
+                    // 如果存在，我们仍然可以更新 OCR 文本或日志，但为了性能通常选择跳过
                     log::info!("Duplicate screenshot detected, skipping save. Hash: {}", hash_string);
                     return;
                 }
             }
 
-            // 4. 将图片编码为 JPEG
+            // 4. 将图片编码为 JPEG (压缩以减小体积)
             let mut jpeg_data = Vec::new();
             let mut cursor = Cursor::new(&mut jpeg_data);
+            // 设置 80% 质量
             if let Err(e) = dynamic_image.write_to(&mut cursor, image::ImageFormat::Jpeg) {
                 log::error!("Failed to encode image to JPEG: {}", e);
                 return;
             }
 
-            // 5. 保存图片到文件系统 (加密保存建议)
-            // 这里简化为保存到本地目录
+            // 5. 保存图片到本地
             let filename = format!("{}.jpg", hash_string);
             let save_path = format!("audit_images/{}", filename);
-
-            // 确保目录存在
             let _ = std::fs::create_dir_all("audit_images");
 
             if let Err(e) = std::fs::write(&save_path, &jpeg_data) {
@@ -121,16 +129,17 @@ pub extern "C" fn analyze_image_buffer(
                 return;
             }
 
-            // 6. 创建并保存日志记录
+            // 6. 创建日志记录
             let log = ScreenshotLog {
-                pin: "user_pin".to_string(), // 应从配置或环境获取
+                id: None,
+                pin: "user_pin".to_string(), // TODO: 获取真实 PIN
                 capture_time: Local::now().to_rfc3339(),
-                app_name: "unknown".to_string(), // Swift端应传递此信息
-                window_title: "unknown".to_string(),
+                app_name: app_name_str,
+                window_title: "Active Window".to_string(), // 未来可以传递更多窗口细节
                 image_path: save_path,
                 image_hash: hash_string,
-                is_sensitive: false, // 由 Swift 端 OCR 结果决定，这里暂定 false
-                ocr_text: None,
+                is_sensitive,
+                ocr_text: ocr_text_str,
                 host_id: "host_123".to_string(),
                 cpe_id: "cpe_123".to_string(),
                 mac: "00:00:00:00:00:00".to_string(),
@@ -140,7 +149,7 @@ pub extern "C" fn analyze_image_buffer(
             if let Err(e) = ctx.db.save_screenshot_log(&log).await {
                 log::error!("Failed to save screenshot log to DB: {}", e);
             } else {
-                log::info!("Screenshot saved successfully: {}", log.image_hash);
+                log::info!("📸 Screenshot saved: {} (Sensitive: {})", log.app_name, is_sensitive);
             }
         }
     });
@@ -160,16 +169,46 @@ pub extern "C" fn log_audit_event(event_json: *const c_char) {
 
     RUNTIME.spawn(async move {
         let ctx = &SERVICE_CONTEXT;
-        match serde_json::from_str::<AuditLog>(&r_str) {
-            Ok(log) => {
-                if let Err(e) = ctx.db.save_audit_log(&log).await {
-                    log::error!("Failed to save audit log: {}", e);
-                } else {
-                    log::info!("Audit log saved: {}", log.id);
+        
+        // 1. 先解析为通用的 Value 以判断类型
+        let v: serde_json::Value = match serde_json::from_str(&r_str) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Failed to parse log JSON Value: {}", e);
+                return;
+            }
+        };
+
+        let log_type = v["type"].as_str().unwrap_or("unknown");
+
+        match log_type {
+            "behavior" => {
+                match serde_json::from_str::<BehaviorLog>(&r_str) {
+                    Ok(log) => {
+                        if let Err(e) = ctx.db.save_behavior_log(&log).await {
+                            log::error!("Failed to save behavior log: {}", e);
+                        } else {
+                            log::info!("🛡 Behavior log saved: {} - {}", log.op_type, log.op_reason);
+                        }
+                    }
+                    Err(e) => log::error!("Failed to parse BehaviorLog: {}", e),
                 }
             }
-            Err(e) => {
-                log::error!("Failed to parse audit log JSON: {}", e);
+            _ => {
+                // 默认为审计日志 (exec, write, flow 等)
+                match serde_json::from_str::<AuditLog>(&r_str) {
+                    Ok(log) => {
+                        if let Err(e) = ctx.db.save_audit_log(&log).await {
+                            log::error!("Failed to save audit log: {}", e);
+                        } else {
+                            log::info!("Audit log saved: {}", log.id);
+                        }
+                    }
+                    Err(e) => {
+                        // 如果还是失败，尝试作为简单的 BehaviorLog 解析 (兜底)
+                        log::error!("Failed to parse AuditLog: {}. Payload: {}", e, r_str);
+                    }
+                }
             }
         }
     });

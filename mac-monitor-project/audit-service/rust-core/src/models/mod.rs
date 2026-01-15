@@ -27,16 +27,29 @@ pub struct BehaviorLog {
     pub id: Option<i64>,
     pub proc: String,
     pub op_time: String,
+    #[serde(default = "default_pin")]
     pub pin: String,
+    #[serde(default = "default_string")]
     pub op_file: String,
     pub op_type: String, // 1 修改文件 2 完整性校验检查 3剪切板 4共享网络 5共享热点 6网络代理 7wlan设备插拔行为
     pub op_ret: String,
     pub op_reason: String,
+    #[serde(default = "default_host")]
     pub host_id: String,
+    #[serde(default = "default_cpe")]
     pub cpe_id: String,
+    #[serde(default = "default_mac")]
     pub mac: String,
+    #[serde(default = "default_ip")]
     pub ip: String,
 }
+
+fn default_pin() -> String { "user_pin".to_string() }
+fn default_string() -> String { "".to_string() }
+fn default_host() -> String { "host_123".to_string() }
+fn default_cpe() -> String { "cpe_123".to_string() }
+fn default_mac() -> String { "00:00:00:00:00:00".to_string() }
+fn default_ip() -> String { "127.0.0.1".to_string() }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScreenshotLog {

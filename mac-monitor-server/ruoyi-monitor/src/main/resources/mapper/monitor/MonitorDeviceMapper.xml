@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.monitor.mapper.MonitorDeviceMapper">
+    
+    <resultMap type="MonitorDevice" id="MonitorDeviceResult">
+        <result property="deviceId"    column="device_id"    />
+        <result property="serialNumber"    column="serial_number"    />
+        <result property="deviceName"    column="device_name"    />
+        <result property="osVersion"    column="os_version"    />
+        <result property="appVersion"    column="app_version"    />
+        <result property="status"    column="status"    />
+        <result property="lastHeartbeat"    column="last_heartbeat"    />
+        <result property="policyId"    column="policy_id"    />
+        <result property="policyVersion"    column="policy_version"    />
+        <result property="registeredIp"    column="registered_ip"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="targetVersion"    column="target_version"    />
+    </resultMap>
+
+    <sql id="selectMonitorDeviceVo">
+        select d.device_id, d.serial_number, d.device_name, d.os_version, d.app_version, d.status, d.last_heartbeat, d.policy_id, d.policy_version, d.registered_ip, d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
+               COALESCE(p.version, (select version from monitor_policy where is_default = '1' limit 1)) as target_version
+        from monitor_device d
+        left join monitor_policy p on d.policy_id = p.policy_id
+    </sql>
+
+    <select id="selectMonitorDeviceList" parameterType="MonitorDevice" resultMap="MonitorDeviceResult">
+        <include refid="selectMonitorDeviceVo"/>
+        <where>  
+            <if test="serialNumber != null  and serialNumber != ''"> and serial_number = #{serialNumber}</if>
+            <if test="deviceName != null  and deviceName != ''"> and device_name like concat('%', #{deviceName}, '%')</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+    </select>
+    
+    <select id="selectMonitorDeviceByDeviceId" parameterType="Long" resultMap="MonitorDeviceResult">
+        <include refid="selectMonitorDeviceVo"/>
+        where device_id = #{deviceId}
+    </select>
+
+    <select id="selectMonitorDeviceBySerialNumber" parameterType="String" resultMap="MonitorDeviceResult">
+        <include refid="selectMonitorDeviceVo"/>
+        where serial_number = #{serialNumber}
+    </select>
+        
+    <insert id="insertMonitorDevice" parameterType="MonitorDevice" useGeneratedKeys="true" keyProperty="deviceId">
+        insert into monitor_device
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="serialNumber != null and serialNumber != ''">serial_number,</if>
+            <if test="deviceName != null">device_name,</if>
+            <if test="osVersion != null">os_version,</if>
+            <if test="appVersion != null">app_version,</if>
+            <if test="status != null">status,</if>
+            <if test="lastHeartbeat != null">last_heartbeat,</if>
+            <if test="policyId != null">policy_id,</if>
+            <if test="policyVersion != null">policy_version,</if>
+            <if test="registeredIp != null">registered_ip,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="serialNumber != null and serialNumber != ''">#{serialNumber},</if>
+            <if test="deviceName != null">#{deviceName},</if>
+            <if test="osVersion != null">#{osVersion},</if>
+            <if test="appVersion != null">#{appVersion},</if>
+            <if test="status != null">#{status},</if>
+            <if test="lastHeartbeat != null">#{lastHeartbeat},</if>
+            <if test="policyId != null">#{policyId},</if>
+            <if test="policyVersion != null">#{policyVersion},</if>
+            <if test="registeredIp != null">#{registeredIp},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateMonitorDevice" parameterType="MonitorDevice">
+        update monitor_device
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="serialNumber != null and serialNumber != ''">serial_number = #{serialNumber},</if>
+            <if test="deviceName != null">device_name = #{deviceName},</if>
+            <if test="osVersion != null">os_version = #{osVersion},</if>
+            <if test="appVersion != null">app_version = #{appVersion},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="lastHeartbeat != null">last_heartbeat = #{lastHeartbeat},</if>
+            <if test="policyId != null">policy_id = #{policyId},</if>
+            <if test="policyVersion != null">policy_version = #{policyVersion},</if>
+            <if test="registeredIp != null">registered_ip = #{registeredIp},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where device_id = #{deviceId}
+    </update>
+
+    <delete id="deleteMonitorDeviceByDeviceId" parameterType="Long">
+        delete from monitor_device where device_id = #{deviceId}
+    </delete>
+
+    <delete id="deleteMonitorDeviceByDeviceIds" parameterType="String">
+        delete from monitor_device where device_id in 
+        <foreach item="deviceId" collection="array" open="(" separator="," close=")">
+            #{deviceId}
+        </foreach>
+    </delete>
+</mapper>

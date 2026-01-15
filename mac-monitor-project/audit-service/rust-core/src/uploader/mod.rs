@@ -108,7 +108,7 @@ impl Uploader {
         }
     }
 
-    pub async fn get_server_time(&self) -> Result<String, String> {
+    pub async fn get_server_time(&self) -> Result<u64, String> {
         let response = self.client.get(format!("{}/httpsaudit/zf/api/third/server/time", self.base_url))
             .send()
             .await
@@ -124,6 +124,71 @@ impl Uploader {
         }
 
         let res: TimeResponse = response.json().await.map_err(|e| e.to_string())?;
-        Ok(res.data.systime)
+        // 尝试解析字符串时间为 Unix 时间戳，或直接要求后端返回数字
+        res.data.systime.parse::<u64>().map_err(|_| "Invalid server time format".to_string())
+    }
+
+    pub async fn heartbeat(&self, current_version: &str) -> Result<crate::models::HeartbeatResponse, String> {
+        let data = serde_json::json!({
+            "app_version": current_version,
+            "timestamp": SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+        });
+        
+        let token = self.get_token().await?;
+        let response = self.client.post(format!("{}/api/v1/heartbeat", self.base_url))
+            .header("visit-token", token)
+            .json(&data)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        response.json().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn get_pop_list(&self) -> Result<Vec<crate::models::PopNode>, String> {
+        let token = self.get_token().await?;
+        let response = self.client.get(format!("{}/api/v1/pop/list", self.base_url))
+            .header("visit-token", token)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        #[derive(Deserialize)]
+        struct PopListResponse {
+            data: Vec<crate::models::PopNode>,
+        }
+
+        let res: PopListResponse = response.json().await.map_err(|e| e.to_string())?;
+        Ok(res.data)
+    }
+
+    pub async fn check_update(&self) -> Result<crate::models::UpdateInfo, String> {
+        let response = self.client.get(format!("{}/api/v1/maintenance/update", self.base_url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        #[derive(Deserialize)]
+        struct UpdateResponse {
+            data: crate::models::UpdateInfo,
+        }
+
+        let res: UpdateResponse = response.json().await.map_err(|e| e.to_string())?;
+        Ok(res.data)
+    }
+
+    pub async fn get_cert_info(&self) -> Result<crate::models::CertInfo, String> {
+        let response = self.client.get(format!("{}/api/v1/maintenance/cert", self.base_url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        #[derive(Deserialize)]
+        struct CertResponse {
+            data: crate::models::CertInfo,
+        }
+
+        let res: CertResponse = response.json().await.map_err(|e| e.to_string())?;
+        Ok(res.data)
     }
 }

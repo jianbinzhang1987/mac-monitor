@@ -15,6 +15,30 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             return
         }
 
+        // 1.1 同步设备信息到 Rust（用于审计日志字段填充）
+        let pin = stringConfigValue(key: "pin_number", options: options) ?? ""
+        let ip = stringConfigValue(key: "ip", options: options) ?? ""
+        let mac = stringConfigValue(key: "mac", options: options) ?? ""
+        let cpeId = stringConfigValue(key: "cpe_id", options: options) ?? ""
+        let hostId = stringConfigValue(key: "host_id", options: options) ?? ""
+        let policyJson = stringConfigValue(key: "audit_policy_json", options: options) ?? ""
+        pin.withCString { pinPtr in
+            ip.withCString { ipPtr in
+                mac.withCString { macPtr in
+                    cpeId.withCString { cpePtr in
+                        hostId.withCString { hostPtr in
+                            set_device_info(pinPtr, ipPtr, macPtr, cpePtr, hostPtr)
+                        }
+                    }
+                }
+            }
+        }
+        if !policyJson.isEmpty {
+            policyJson.withCString { policyPtr in
+                _ = set_audit_policy(policyPtr)
+            }
+        }
+
         let networkSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
 
         // Configure IPv4 settings
@@ -102,6 +126,24 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             }
         }
     }
+
+    private func stringConfigValue(key: String, options: [String: NSObject]?) -> String? {
+        if let value = options?[key] as? String {
+            return value
+        }
+        if let value = options?[key] as? NSString {
+            return value as String
+        }
+        if let providerConfig = (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration {
+            if let value = providerConfig[key] as? String {
+                return value
+            }
+            if let value = providerConfig[key] as? NSString {
+                return value as String
+            }
+        }
+        return nil
+    }
 }
 
 // FFI Declarations for Rust core
@@ -120,3 +162,14 @@ func get_outbound_packet(_ buffer: UnsafeMutablePointer<UInt8>, _ max_len: Int, 
 @_silgen_name("poll_stack")
 func poll_stack()
 
+@_silgen_name("set_device_info")
+func set_device_info(
+    _ pin_number: UnsafePointer<CChar>,
+    _ ip: UnsafePointer<CChar>,
+    _ mac: UnsafePointer<CChar>,
+    _ cpe_id: UnsafePointer<CChar>,
+    _ host_id: UnsafePointer<CChar>
+)
+
+@_silgen_name("set_audit_policy")
+func set_audit_policy(_ policy_json: UnsafePointer<CChar>) -> Int32

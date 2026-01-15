@@ -3,14 +3,17 @@ use tokio::time::{self, Duration};
 use crate::db::Database;
 use crate::uploader::Uploader;
 
+use crate::clock::LogicalClock;
+
 pub struct SyncService {
     db: Arc<Database>,
     uploader: Arc<Uploader>,
+    clock: Arc<LogicalClock>,
 }
 
 impl SyncService {
-    pub fn new(db: Arc<Database>, uploader: Arc<Uploader>) -> Self {
-        Self { db, uploader }
+    pub fn new(db: Arc<Database>, uploader: Arc<Uploader>, clock: Arc<LogicalClock>) -> Self {
+        Self { db, uploader, clock }
     }
 
     pub fn start(self) {
@@ -18,11 +21,36 @@ impl SyncService {
             let mut interval = time::interval(Duration::from_secs(60)); // 每分钟同步一次
             loop {
                 interval.tick().await;
+                // 1. 执行心跳与较时
+                if let Err(e) = self.do_heartbeat().await {
+                    eprintln!("Heartbeat failed: {}", e);
+                }
+
+                // 2. 同步日志
                 if let Err(e) = self.sync_logs().await {
                     eprintln!("Sync failed: {}", e);
                 }
             }
         });
+    }
+
+    async fn do_heartbeat(&self) -> Result<(), String> {
+        let res = self.uploader.heartbeat("0.1.0").await?;
+        
+        // 更新逻辑时钟
+        self.clock.update_offset(res.server_time as i64);
+
+        if res.need_update {
+            println!("Policy update needed, fetching latest config...");
+            // TODO: 调用 get_config 并更新本地数据库/内存策略
+        }
+
+        for cmd in res.commands {
+            println!("Received remote command: {} ({})", cmd.command_id, cmd.op_type);
+            // TODO: 处理远程指令
+        }
+
+        Ok(())
     }
 
     async fn sync_logs(&self) -> Result<(), String> {

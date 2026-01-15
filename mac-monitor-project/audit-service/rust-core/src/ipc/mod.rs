@@ -17,6 +17,8 @@ struct IpcCommand {
 struct IpcResponse {
     status: String,
     message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    payload: Option<serde_json::Value>,
 }
 
 pub struct IpcServer {
@@ -102,11 +104,77 @@ impl IpcServer {
                     message: "Logged out".to_string(),
                 }
             }
+            "get_pops" => {
+                let uploader = self.uploader.clone();
+                let (tx, rx) = std::sync::mpsc::channel();
+
+                self.runtime_handle.spawn(async move {
+                    let result = uploader.get_pop_list().await;
+                    let _ = tx.send(result);
+                });
+
+                match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+                    Ok(Ok(pops)) => IpcResponse {
+                        status: "ok".to_string(),
+                        message: "Success".to_string(),
+                        payload: Some(serde_json::to_value(pops).unwrap()),
+                    },
+                    Ok(Err(e)) => IpcResponse { status: "error".to_string(), message: e, payload: None },
+                    Err(_) => IpcResponse { status: "error".to_string(), message: "Timeout".to_string(), payload: None },
+                }
+            }
+            "check_update" => {
+                let uploader = self.uploader.clone();
+                let (tx, rx) = std::sync::mpsc::channel();
+                self.runtime_handle.spawn(async move {
+                    let _ = tx.send(uploader.check_update().await);
+                });
+                match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+                    Ok(Ok(info)) => IpcResponse {
+                        status: "ok".to_string(),
+                        message: "Success".to_string(),
+                        payload: Some(serde_json::to_value(info).unwrap()),
+                    },
+                    Ok(Err(e)) => IpcResponse { status: "error".to_string(), message: e, payload: None },
+                    Err(_) => IpcResponse { status: "error".to_string(), message: "Timeout".to_string(), payload: None },
+                }
+            }
+            "get_cert" => {
+                let uploader = self.uploader.clone();
+                let (tx, rx) = std::sync::mpsc::channel();
+                self.runtime_handle.spawn(async move {
+                    let _ = tx.send(uploader.get_cert_info().await);
+                });
+                match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+                    Ok(Ok(info)) => IpcResponse {
+                        status: "ok".to_string(),
+                        message: "Success".to_string(),
+                        payload: Some(serde_json::to_value(info).unwrap()),
+                    },
+                    Ok(Err(e)) => IpcResponse { status: "error".to_string(), message: e, payload: None },
+                    Err(_) => IpcResponse { status: "error".to_string(), message: "Timeout".to_string(), payload: None },
+                }
+            }
+            "get_server_time" => {
+                let uploader = self.uploader.clone();
+                let (tx, rx) = std::sync::mpsc::channel();
+                self.runtime_handle.spawn(async move {
+                    let _ = tx.send(uploader.get_server_time().await);
+                });
+                match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+                    Ok(Ok(time)) => IpcResponse {
+                        status: "ok".to_string(),
+                        message: "Success".to_string(),
+                        payload: Some(serde_json::to_value(time).unwrap()),
+                    },
+                    Ok(Err(e)) => IpcResponse { status: "error".to_string(), message: e, payload: None },
+                    Err(_) => IpcResponse { status: "error".to_string(), message: "Timeout".to_string(), payload: None },
+                }
+            }
             "log_traffic" => {
                 match serde_json::from_value::<AuditLog>(cmd.payload) {
                     Ok(log) => {
                         let db = self.db.clone();
-                        // 使用 runtime handle 异步保存日志
                         self.runtime_handle.spawn(async move {
                             if let Err(e) = db.save_audit_log(&log).await {
                                 eprintln!("Failed to save audit log via IPC: {}", e);
@@ -116,17 +184,20 @@ impl IpcServer {
                         IpcResponse {
                             status: "ok".to_string(),
                             message: "Log queued".to_string(),
+                            payload: None,
                         }
                     }
                     Err(e) => IpcResponse {
                         status: "error".to_string(),
                         message: format!("Invalid AuditLog payload: {}", e),
+                        payload: None,
                     }
                 }
             }
             _ => IpcResponse {
                 status: "error".to_string(),
                 message: format!("Unknown command: {}", cmd.command),
+                payload: None,
             },
         }
     }

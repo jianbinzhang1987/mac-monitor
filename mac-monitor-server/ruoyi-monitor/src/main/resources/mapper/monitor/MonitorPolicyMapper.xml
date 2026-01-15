@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.monitor.mapper.MonitorPolicyMapper">
+    
+    <resultMap type="MonitorPolicy" id="MonitorPolicyResult">
+        <result property="policyId"    column="policy_id"    />
+        <result property="policyName"    column="policy_name"    />
+        <result property="trafficRules"    column="traffic_rules"    />
+        <result property="screenshotRules"    column="screenshot_rules"    />
+        <result property="agentSettings"    column="agent_settings"    />
+        <result property="isDefault"    column="is_default"    />
+        <result property="version"    column="version"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectMonitorPolicyVo">
+        select policy_id, policy_name, traffic_rules, screenshot_rules, agent_settings, is_default, version, create_by, create_time, update_by, update_time, remark from monitor_policy
+    </sql>
+
+    <select id="selectMonitorPolicyList" parameterType="MonitorPolicy" resultMap="MonitorPolicyResult">
+        <include refid="selectMonitorPolicyVo"/>
+        <where>  
+            <if test="policyName != null  and policyName != ''"> and policy_name like concat('%', #{policyName}, '%')</if>
+            <if test="isDefault != null  and isDefault != ''"> and is_default = #{isDefault}</if>
+        </where>
+    </select>
+    
+    <select id="selectMonitorPolicyByPolicyId" parameterType="Long" resultMap="MonitorPolicyResult">
+        <include refid="selectMonitorPolicyVo"/>
+        where policy_id = #{policyId}
+    </select>
+    
+    <select id="selectDefaultPolicy" resultMap="MonitorPolicyResult">
+        <include refid="selectMonitorPolicyVo"/>
+        where is_default = '1' limit 1
+    </select>
+        
+    <insert id="insertMonitorPolicy" parameterType="MonitorPolicy" useGeneratedKeys="true" keyProperty="policyId">
+        insert into monitor_policy
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="policyName != null and policyName != ''">policy_name,</if>
+            <if test="trafficRules != null">traffic_rules,</if>
+            <if test="screenshotRules != null">screenshot_rules,</if>
+            <if test="agentSettings != null">agent_settings,</if>
+            <if test="isDefault != null">is_default,</if>
+            <if test="version != null">version,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="policyName != null and policyName != ''">#{policyName},</if>
+            <if test="trafficRules != null">#{trafficRules},</if>
+            <if test="screenshotRules != null">#{screenshotRules},</if>
+            <if test="agentSettings != null">#{agentSettings},</if>
+            <if test="isDefault != null">#{isDefault},</if>
+            <if test="version != null">#{version},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateMonitorPolicy" parameterType="MonitorPolicy">
+        update monitor_policy
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="policyName != null and policyName != ''">policy_name = #{policyName},</if>
+            <if test="trafficRules != null">traffic_rules = #{trafficRules},</if>
+            <if test="screenshotRules != null">screenshot_rules = #{screenshotRules},</if>
+            <if test="agentSettings != null">agent_settings = #{agentSettings},</if>
+            <if test="isDefault != null">is_default = #{isDefault},</if>
+            <if test="version != null">version = #{version},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where policy_id = #{policyId}
+    </update>
+
+    <delete id="deleteMonitorPolicyByPolicyId" parameterType="Long">
+        delete from monitor_policy where policy_id = #{policyId}
+    </delete>
+
+    <delete id="deleteMonitorPolicyByPolicyIds" parameterType="String">
+        delete from monitor_policy where policy_id in 
+        <foreach item="policyId" collection="array" open="(" separator="," close=")">
+            #{policyId}
+        </foreach>
+    </delete>
+    
+    <update id="resetDefaultPolicy">
+        update monitor_policy set is_default = '0' where is_default = '1'
+    </update>
+</mapper>

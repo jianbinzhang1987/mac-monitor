@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.monitor.mapper.MonitorLogTrafficMapper">
+
+    <resultMap type="MonitorLogTraffic" id="MonitorLogTrafficResult">
+        <result property="logId"    column="log_id"    />
+        <result property="serialNumber"    column="serial_number"    />
+        <result property="auditTime"    column="audit_time"    />
+        <result property="url"    column="url"    />
+        <result property="method"    column="method"    />
+        <result property="domain"    column="domain"    />
+        <result property="processName"    column="process_name"    />
+        <result property="riskLevel"    column="risk_level"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectMonitorLogTrafficVo">
+        select log_id, serial_number, audit_time, url, method, domain, process_name, risk_level, create_time from monitor_log_traffic
+    </sql>
+
+    <select id="selectMonitorLogTrafficList" parameterType="MonitorLogTraffic" resultMap="MonitorLogTrafficResult">
+        <include refid="selectMonitorLogTrafficVo"/>
+        <where>
+            <if test="serialNumber != null  and serialNumber != ''"> and serial_number = #{serialNumber}</if>
+            <if test="domain != null  and domain != ''"> and domain like concat('%', #{domain}, '%')</if>
+            <if test="processName != null  and processName != ''"> and process_name like concat('%', #{processName}, '%')</if>
+            <if test="riskLevel != null "> and risk_level = #{riskLevel}</if>
+        </where>
+        order by audit_time desc
+    </select>
+
+    <select id="selectMonitorLogTrafficByLogId" parameterType="Long" resultMap="MonitorLogTrafficResult">
+        <include refid="selectMonitorLogTrafficVo"/>
+        where log_id = #{logId}
+    </select>
+
+    <insert id="insertMonitorLogTraffic" parameterType="MonitorLogTraffic" useGeneratedKeys="true" keyProperty="logId">
+        insert into monitor_log_traffic
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="serialNumber != null and serialNumber != ''">serial_number,</if>
+            <if test="auditTime != null">audit_time,</if>
+            <if test="url != null">url,</if>
+            <if test="method != null">method,</if>
+            <if test="domain != null">domain,</if>
+            <if test="processName != null">process_name,</if>
+            <if test="riskLevel != null">risk_level,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="serialNumber != null and serialNumber != ''">#{serialNumber},</if>
+            <if test="auditTime != null">#{auditTime},</if>
+            <if test="url != null">#{url},</if>
+            <if test="method != null">#{method},</if>
+            <if test="domain != null">#{domain},</if>
+            <if test="processName != null">#{processName},</if>
+            <if test="riskLevel != null">#{riskLevel},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <delete id="deleteMonitorLogTrafficByLogId" parameterType="Long">
+        delete from monitor_log_traffic where log_id = #{logId}
+    </delete>
+
+    <delete id="deleteMonitorLogTrafficByLogIds" parameterType="String">
+        delete from monitor_log_traffic where log_id in
+        <foreach item="logId" collection="array" open="(" separator="," close=")">
+            #{logId}
+        </foreach>
+    </delete>
+</mapper>

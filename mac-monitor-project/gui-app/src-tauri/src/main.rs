@@ -3,7 +3,11 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use tauri::{Manager, State};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, State,
+};
 use tokio::time::{self, Duration};
 use interprocess::local_socket::LocalSocketStream;
 use std::io::{Read, Write};
@@ -12,9 +16,22 @@ use std::io::{Read, Write};
 struct AppState {
     is_logged_in: bool,
     pin: String,
+    token: String,
     server_ip: String,
     server_port: String,
     cpe_id: String,
+    device_info: Option<DeviceInfoPayload>,
+    current_pop: Option<PopNode>,
+    available_pops: Vec<PopNode>,
+    audit_policy_json: Option<String>,
+    logic_clock: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct PopNode {
+    id: String,
+    name: String,
+    latency: u32,
 }
 
 struct ManagedState(Arc<Mutex<AppState>>);
@@ -32,8 +49,28 @@ struct LoginPayload {
     pin: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct DeviceInfoPayload {
+    pin_number: String,
+    ip: String,
+    mac: String,
+    cpe_id: String,
+    host_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct AuditPolicyPayload {
+    policy_json: String,
+}
+
 async fn send_ipc_command(command: &str, payload: serde_json::Value) -> Result<String, String> {
     let socket_path = "/tmp/mac_monitor_audit.sock";
+    
+    // 检查套接字文件是否存在
+    if !std::path::Path::new(socket_path).exists() {
+        return Err("审计服务未启动（套接字文件不存在）".to_string());
+    }
+
     let mut stream = LocalSocketStream::connect(socket_path)
         .map_err(|e| format!("无法连接到审计服务: {}", e))?;
 
@@ -45,22 +82,99 @@ async fn send_ipc_command(command: &str, payload: serde_json::Value) -> Result<S
     let cmd_str = full_command.to_string();
     stream.write_all(cmd_str.as_bytes())
         .map_err(|e| format!("发送指令失败: {}", e))?;
+    
+    // 发送结束符或关闭写端（取决于服务端实现，这里假设服务端读到 JSON 后会处理）
+    stream.flush().map_err(|e| e.to_string())?;
 
-    // Shutdown write half if supported or just wait for response
-    // For simplicity, we expect a short JSON response
     let mut response = String::new();
     stream.read_to_string(&mut response)
         .map_err(|e| format!("读取响应失败: {}", e))?;
 
+    if response.is_empty() {
+        return Err("审计服务响应为空".to_string());
+    }
+
     Ok(response)
+}
+
+fn device_info_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let base_dir = app_handle
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("无法获取配置目录: {}", e))?;
+    std::fs::create_dir_all(&base_dir).map_err(|e| format!("无法创建配置目录: {}", e))?;
+    Ok(base_dir.join("device_info.json"))
+}
+
+#[derive(Debug, Deserialize)]
+struct IpcResponse {
+    status: String,
+    message: String,
+    payload: Option<serde_json::Value>,
+}
+
+#[tauri::command]
+async fn get_pop_nodes(state: State<'_, ManagedState>) -> Result<Vec<PopNode>, String> {
+    let res_str = send_ipc_command("get_pops", serde_json::Value::Null).await?;
+    let res: IpcResponse = serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
+    
+    if res.status == "ok" {
+        if let Some(payload) = res.payload {
+            let raw_pops: Vec<serde_json::Value> = serde_json::from_value(payload).map_err(|e| e.to_string())?;
+            let mut pops = Vec::new();
+            for p in raw_pops {
+                pops.push(PopNode {
+                    id: p["pop_id"].as_str().unwrap_or("").to_string(),
+                    name: p["name"].as_str().unwrap_or("Unknown").to_string(),
+                    latency: p["latency_hint"].as_u64().unwrap_or(0) as u32,
+                });
+            }
+            let mut s = state.0.lock().unwrap();
+            s.available_pops = pops.clone();
+            Ok(pops)
+        } else {
+            Ok(vec![])
+        }
+    } else {
+        Err(res.message)
+    }
+}
+
+#[tauri::command]
+async fn switch_pop_node(node_id: String, state: State<'_, ManagedState>) -> Result<String, String> {
+    let node = {
+        let s = state.0.lock().unwrap();
+        s.available_pops.iter().find(|n| n.id == node_id).cloned()
+    };
+
+    if let Some(node) = node {
+        let mut s = state.0.lock().unwrap();
+        s.current_pop = Some(node.clone());
+        println!("Switching to POP node: {}", node.name);
+        Ok(format!("已切换至 {}", node.name))
+    } else {
+        Err("找不到指定的节点".to_string())
+    }
+}
+
+#[tauri::command]
+async fn check_for_updates() -> Result<serde_json::Value, String> {
+    let res_str = send_ipc_command("check_update", serde_json::Value::Null).await?;
+    let res: IpcResponse = serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
+    
+    if res.status == "ok" {
+        Ok(res.payload.unwrap_or(serde_json::json!({ "has_update": false })))
+    } else {
+        Err(res.message)
+    }
 }
 
 #[tauri::command]
 async fn register(payload: RegisterPayload, state: State<'_, ManagedState>) -> Result<String, String> {
     println!("Registering device: {:?}", payload);
 
-    let ipc_res = send_ipc_command("register", serde_json::to_value(&payload).unwrap()).await?;
-    println!("Audit service response: {}", ipc_res);
+    let _ipc_res = send_ipc_command("register", serde_json::to_value(&payload).unwrap()).await?;
+    // println!("Audit service response: {}", ipc_res); // Removed as per new code
 
     let mut s = state.0.lock().unwrap();
     s.server_ip = payload.server_ip;
@@ -76,28 +190,110 @@ async fn login(payload: LoginPayload, state: State<'_, ManagedState>) -> Result<
     println!("Logging in with PIN: {}", payload.pin);
 
     let ipc_res = send_ipc_command("login", serde_json::to_value(&payload).unwrap()).await?;
-    println!("Audit service response: {}", ipc_res);
+    let res: IpcResponse = serde_json::from_str(&ipc_res).map_err(|e| e.to_string())?;
 
     let mut s = state.0.lock().unwrap();
     s.pin = payload.pin;
     s.is_logged_in = true;
+    
+    if let Some(payload) = res.payload {
+        if let Some(token) = payload["token"].as_str() {
+            s.token = token.to_string();
+        }
+    }
 
     Ok("登录成功".to_string())
+}
+
+#[tauri::command]
+async fn set_device_info(
+    payload: DeviceInfoPayload,
+    // app_handle: tauri::AppHandle, // Removed as per new code
+    state: State<'_, ManagedState>,
+) -> Result<String, String> {
+    // let path = device_info_path(&app_handle)?; // Removed as per new code
+    // let data = serde_json::to_vec(&payload).map_err(|e| format!("序列化失败: {}", e))?; // Removed as per new code
+    // std::fs::write(&path, data).map_err(|e| format!("写入配置失败: {}", e))?; // Removed as per new code
+
+    let mut s = state.0.lock().unwrap();
+    s.device_info = Some(payload);
+
+    Ok("设备信息已同步".to_string())
+}
+
+#[tauri::command]
+async fn set_audit_policy(
+    payload: AuditPolicyPayload,
+    app_handle: tauri::AppHandle,
+    state: State<'_, ManagedState>,
+) -> Result<String, String> {
+    let base_dir = app_handle
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("无法获取配置目录: {}", e))?;
+    std::fs::create_dir_all(&base_dir).map_err(|e| format!("无法创建配置目录: {}", e))?;
+    let path = base_dir.join("audit_policy.json");
+    std::fs::write(&path, payload.policy_json.as_bytes())
+        .map_err(|e| format!("写入策略失败: {}", e))?;
+
+    let mut s = state.0.lock().unwrap();
+    s.audit_policy_json = Some(payload.policy_json);
+
+    Ok("审计策略已保存".to_string())
 }
 
 fn start_heartbeat_loop(app_handle: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut interval = time::interval(Duration::from_secs(30));
+        let client = reqwest::Client::new();
+        
         loop {
             interval.tick().await;
-            let state = app_handle.state::<ManagedState>();
-            let s = state.0.lock().unwrap().clone();
+            let (is_logged, token, server_ip, server_port, pop_id, clock) = {
+                let state = app_handle.state::<ManagedState>();
+                let mut s = state.0.lock().unwrap();
+                s.logic_clock += 1; // 递增本地逻辑时钟
+                (
+                    s.is_logged_in, 
+                    s.token.clone(), 
+                    s.server_ip.clone(), 
+                    s.server_port.clone(),
+                    s.current_pop.as_ref().map(|p| p.id.clone()),
+                    s.logic_clock
+                )
+            };
 
-            if s.is_logged_in {
-                println!("Sending heartbeat for PIN: {}", s.pin);
-                // TODO: Perform HTTP POST to heartbeat endpoint
-                // let client = reqwest::Client::new();
-                // ...
+            if is_logged && !server_ip.is_empty() {
+                let url = format!("http://{}:{}/api/v1/heartbeat", server_ip, server_port);
+                let payload = serde_json::json!({
+                    "token": token,
+                    "logic_clock": clock,
+                    "pop_id": pop_id,
+                    "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
+                });
+
+                println!("💓 Heartbeat: sending to {}", url);
+                
+                match client.post(&url).json(&payload).send().await {
+                    Ok(resp) => {
+                        if resp.status().is_success() {
+                            if let Ok(data) = resp.json::<serde_json::Value>().await {
+                                // 处理服务端逻辑时钟校准
+                                if let Some(srv_clock) = data["server_logic_clock"].as_u64() {
+                                    let state = app_handle.state::<ManagedState>();
+                                    let mut s = state.0.lock().unwrap();
+                                    if srv_clock > s.logic_clock {
+                                        s.logic_clock = srv_clock;
+                                    }
+                                }
+                                println!("✅ Heartbeat success: server sync clock");
+                            }
+                        } else {
+                            eprintln!("❌ Heartbeat failed with status: {}", resp.status());
+                        }
+                    }
+                    Err(e) => eprintln!("❌ Heartbeat network error: {}", e),
+                }
             }
         }
     });
@@ -110,16 +306,69 @@ fn main() {
         server_ip: String::new(),
         server_port: String::new(),
         cpe_id: String::new(),
+        device_info: None,
+        current_pop: None,
+        available_pops: vec![
+            PopNode { id: "hk-01".into(), name: "香港 CN2 01".into(), latency: 25 },
+            PopNode { id: "sg-01".into(), name: "新加坡 BGP 01".into(), latency: 45 },
+            PopNode { id: "jp-01".into(), name: "东京 NTT 01".into(), latency: 60 },
+        ],
+        logic_clock: 0,
+        token: String::new(),
+        audit_policy_json: None,
     })));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(app_state)
         .setup(|app| {
-            start_heartbeat_loop(app.handle().clone());
+            let handle = app.handle();
+            
+            // 1. 创建托盘图标及其菜单（Tauri 2 风格）
+            let show_i = MenuItem::with_id(handle, "show", "显示主界面", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(handle, "quit", "退出客户端 (需验证)", true, None::<&str>)?;
+            let menu = Menu::with_items(handle, &[&show_i, &quit_i])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app: &tauri::AppHandle, event| {
+                    match event.id.as_ref() {
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray: &tauri::tray::TrayIcon, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            start_heartbeat_loop(handle.clone());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![register, login])
+        .invoke_handler(tauri::generate_handler![
+            register, login, set_device_info, set_audit_policy,
+            get_pop_nodes, switch_pop_node, check_for_updates
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

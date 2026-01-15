@@ -73,6 +73,12 @@
             <artifactId>ruoyi-asset</artifactId>
         </dependency>
 
+        <!-- Mac Monitor 模块 -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-monitor</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>
