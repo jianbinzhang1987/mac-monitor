@@ -12,28 +12,34 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="filePath"    column="file_path"    />
         <result property="ocrText"    column="ocr_text"    />
         <result property="riskLevel"    column="risk_level"    />
+        <result property="hostId"    column="host_id"    />
+        <result property="mac"    column="mac"    />
+        <result property="ip"    column="ip"    />
+        <result property="appName"    column="app_name"    />
+        <result property="imageHash"    column="image_hash"    />
         <result property="createTime"    column="create_time"    />
     </resultMap>
 
     <sql id="selectMonitorLogScreenshotVo">
-        select log_id, device_id, serial_number, capture_time, file_path, ocr_text, risk_level, create_time from monitor_log_screenshot
+        select log_id, device_id, serial_number, capture_time, file_path, ocr_text, risk_level, host_id, mac, ip, app_name, image_hash, create_time from monitor_log_screenshot
     </sql>
 
     <select id="selectMonitorLogScreenshotList" parameterType="MonitorLogScreenshot" resultMap="MonitorLogScreenshotResult">
         <include refid="selectMonitorLogScreenshotVo"/>
-        <where>  
+        <where>
             <if test="serialNumber != null  and serialNumber != ''"> and serial_number like concat('%', #{serialNumber}, '%')</if>
             <if test="riskLevel != null "> and risk_level = #{riskLevel}</if>
+            <if test="appName != null  and appName != ''"> and app_name like concat('%', #{appName}, '%')</if>
             <if test="params.beginCaptureTime != null and params.beginCaptureTime != '' and params.endCaptureTime != null and params.endCaptureTime != ''"> and capture_time between #{params.beginCaptureTime} and #{params.endCaptureTime}</if>
         </where>
         order by capture_time desc
     </select>
-    
+
     <select id="selectMonitorLogScreenshotByLogId" parameterType="Long" resultMap="MonitorLogScreenshotResult">
         <include refid="selectMonitorLogScreenshotVo"/>
         where log_id = #{logId}
     </select>
-        
+
     <insert id="insertMonitorLogScreenshot" parameterType="MonitorLogScreenshot" useGeneratedKeys="true" keyProperty="logId">
         insert into monitor_log_screenshot
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -43,6 +49,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="filePath != null and filePath != ''">file_path,</if>
             <if test="ocrText != null">ocr_text,</if>
             <if test="riskLevel != null">risk_level,</if>
+            <if test="hostId != null and hostId != ''">host_id,</if>
+            <if test="mac != null and mac != ''">mac,</if>
+            <if test="ip != null and ip != ''">ip,</if>
+            <if test="appName != null and appName != ''">app_name,</if>
+            <if test="imageHash != null and imageHash != ''">image_hash,</if>
             <if test="createTime != null">create_time,</if>
          </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
@@ -52,6 +63,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="filePath != null and filePath != ''">#{filePath},</if>
             <if test="ocrText != null">#{ocrText},</if>
             <if test="riskLevel != null">#{riskLevel},</if>
+            <if test="hostId != null and hostId != ''">#{hostId},</if>
+            <if test="mac != null and mac != ''">#{mac},</if>
+            <if test="ip != null and ip != ''">#{ip},</if>
+            <if test="appName != null and appName != ''">#{appName},</if>
+            <if test="imageHash != null and imageHash != ''">#{imageHash},</if>
             <if test="createTime != null">#{createTime},</if>
          </trim>
     </insert>
@@ -65,6 +81,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="filePath != null and filePath != ''">file_path = #{filePath},</if>
             <if test="ocrText != null">ocr_text = #{ocrText},</if>
             <if test="riskLevel != null">risk_level = #{riskLevel},</if>
+            <if test="hostId != null and hostId != ''">host_id = #{hostId},</if>
+            <if test="mac != null and mac != ''">mac = #{mac},</if>
+            <if test="ip != null and ip != ''">ip = #{ip},</if>
+            <if test="appName != null and appName != ''">app_name = #{appName},</if>
+            <if test="imageHash != null and imageHash != ''">image_hash = #{imageHash},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
         </trim>
         where log_id = #{logId}

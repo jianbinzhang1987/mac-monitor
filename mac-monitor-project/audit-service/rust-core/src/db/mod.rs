@@ -86,6 +86,22 @@ impl Database {
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_screenshot_hash ON screenshot_logs(image_hash)")
             .execute(&self.pool).await?;
 
+        // 数据库迁移：尝试添加新字段 (忽略已存在的错误)
+        // Behavior Logs
+        let _ = sqlx::query("ALTER TABLE behavior_logs ADD COLUMN host_id TEXT").execute(&self.pool).await;
+        let _ = sqlx::query("ALTER TABLE behavior_logs ADD COLUMN mac TEXT").execute(&self.pool).await;
+        let _ = sqlx::query("ALTER TABLE behavior_logs ADD COLUMN ip TEXT").execute(&self.pool).await;
+
+        // Audit Logs
+        let _ = sqlx::query("ALTER TABLE audit_logs ADD COLUMN host_id TEXT").execute(&self.pool).await;
+        let _ = sqlx::query("ALTER TABLE audit_logs ADD COLUMN mac TEXT").execute(&self.pool).await;
+        let _ = sqlx::query("ALTER TABLE audit_logs ADD COLUMN ip TEXT").execute(&self.pool).await;
+
+        // Screenshot Logs
+        let _ = sqlx::query("ALTER TABLE screenshot_logs ADD COLUMN host_id TEXT").execute(&self.pool).await;
+        let _ = sqlx::query("ALTER TABLE screenshot_logs ADD COLUMN mac TEXT").execute(&self.pool).await;
+        let _ = sqlx::query("ALTER TABLE screenshot_logs ADD COLUMN ip TEXT").execute(&self.pool).await;
+
         Ok(())
     }
 

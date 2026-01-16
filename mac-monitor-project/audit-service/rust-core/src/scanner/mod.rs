@@ -23,6 +23,8 @@ impl Scanner {
     }
 
     pub async fn scan(&mut self) {
+        log::info!("[Scanner] Starting security scan... checking processes and applications");
+
         // 刷新系统信息
         self.sys.refresh_processes();
 
@@ -86,6 +88,9 @@ impl Scanner {
     }
 
     async fn report_anomaly(&self, proc: &str, op_type: &str, detail: &str) {
+        // 使用 log::warn 记录报警信息
+        log::warn!("🚨 [Scanner ALARM] Type: {}, Detail: {}", op_type, detail);
+
         let log = BehaviorLog {
             id: None,
             proc: proc.to_string(),

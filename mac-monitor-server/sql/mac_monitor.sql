@@ -43,8 +43,8 @@ CREATE TABLE `monitor_policy` (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='监控策略表';
 
 -- 初始化默认策略
-INSERT INTO `monitor_policy` (`policy_name`, `traffic_rules`, `screenshot_rules`, `agent_settings`, `is_default`, `version`, `create_time`) 
-VALUES ('默认策略', '{"whitelist":["apple.com","google.com"]}', '{"interval":300}', '{"heartbeatInterval":60}', '1', 1, sysdate());
+INSERT INTO `monitor_policy` (`policy_name`, `traffic_rules`, `screenshot_rules`, `agent_settings`, `is_default`, `version`, `create_time`)
+VALUES ('默认策略', '{"whitelist":["apple.com","google.com"]}', '{"interval":300}', '{"heartbeatInterval":60,"process_blacklist":["clash","v2ray","proxyman","qq"],"app_blacklist":["clash","v2ray","proxyman","qq"]}', '1', 1, sysdate());
 
 -- ----------------------------
 -- monitor_log_screenshot 截图日志表
@@ -58,6 +58,9 @@ CREATE TABLE `monitor_log_screenshot` (
   `file_path`           varchar(255)    DEFAULT ''      COMMENT '文件路径',
   `ocr_text`            text                            COMMENT 'OCR识别文本',
   `risk_level`          int(11)         DEFAULT 0       COMMENT '风险等级(0-2)',
+  `host_id`             varchar(64)     DEFAULT ''      COMMENT '主机ID',
+  `mac`                 varchar(64)     DEFAULT ''      COMMENT 'MAC地址',
+  `ip`                  varchar(64)     DEFAULT ''      COMMENT 'IP地址',
   `create_time`         datetime                        COMMENT '入库时间',
   PRIMARY KEY (`log_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='截图日志表';
@@ -92,6 +95,9 @@ CREATE TABLE `monitor_log_behavior` (
   `process_name`        varchar(128)    DEFAULT ''      COMMENT '相关进程',
   `detail`              text                            COMMENT '详细描述(JSON)',
   `risk_level`          int(11)         DEFAULT 0       COMMENT '风险等级(0-2)',
+  `host_id`             varchar(64)     DEFAULT ''      COMMENT '主机ID',
+  `mac`                 varchar(64)     DEFAULT ''      COMMENT 'MAC地址',
+  `ip`                  varchar(64)     DEFAULT ''      COMMENT 'IP地址',
   `create_time`         datetime                        COMMENT '入库时间',
   PRIMARY KEY (`log_id`),
   KEY `idx_serial_number` (`serial_number`),

@@ -1,3 +1,4 @@
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tokio::time::{self, Duration};
 use crate::db::Database;
@@ -13,6 +14,7 @@ pub struct SyncService {
     clock: Arc<LogicalClock>,
     policy: Arc<RwLock<PolicyConfig>>,
     device_info: crate::models::DeviceInfo,
+    screenshot_dir: String,
 }
 
 impl SyncService {
@@ -22,8 +24,9 @@ impl SyncService {
         clock: Arc<LogicalClock>,
         policy: Arc<RwLock<PolicyConfig>>,
         device_info: crate::models::DeviceInfo,
+        screenshot_dir: String,
     ) -> Self {
-        Self { db, uploader, clock, policy, device_info }
+        Self { db, uploader, clock, policy, device_info, screenshot_dir }
     }
 
     pub fn start(self) {
@@ -109,6 +112,19 @@ impl SyncService {
         // 3. 同步截图日志
         let screenshot_logs = self.db.get_unsent_screenshot_logs().await.map_err(|e| e.to_string())?;
         for mut log in screenshot_logs {
+            let resolved_path = self.resolve_screenshot_path(&log.image_path);
+            if !Path::new(&resolved_path).exists() {
+                eprintln!(
+                    "Screenshot file missing after path resolution, marking as sent: {}",
+                    log.image_path
+                );
+                self.db.mark_screenshot_log_sent(&log.image_hash).await.map_err(|e| e.to_string())?;
+                continue;
+            }
+
+            if log.image_path != resolved_path {
+                log.image_path = resolved_path;
+            }
             // 3.1 首先上传真实的图片文件
             match self.uploader.upload_file(&log.image_path).await {
                 Ok(remote_url) => {
@@ -135,5 +151,20 @@ impl SyncService {
         }
 
         Ok(())
+    }
+
+    fn resolve_screenshot_path(&self, image_path: &str) -> String {
+        let path = Path::new(image_path);
+        if path.exists() {
+            return image_path.to_string();
+        }
+
+        let file_name = path.file_name().and_then(|n| n.to_str());
+        if let Some(file_name) = file_name {
+            let candidate: PathBuf = Path::new(&self.screenshot_dir).join(file_name);
+            return candidate.to_string_lossy().to_string();
+        }
+
+        image_path.to_string()
     }
 }

@@ -19,3 +19,11 @@ func rust_log_audit_event(_ event_json: UnsafePointer<CChar>)
 
 @_silgen_name("export_root_ca_pem")
 func rust_export_root_ca_pem(_ buffer: UnsafeMutablePointer<UInt8>, _ buffer_len: Int) -> Int32
+
+@_silgen_name("register_device")
+func rust_register_device(
+    _ server_ip: UnsafePointer<CChar>,
+    _ server_port: UnsafePointer<CChar>,
+    _ cpe_id: UnsafePointer<CChar>,
+    _ pin: UnsafePointer<CChar>
+) -> Bool

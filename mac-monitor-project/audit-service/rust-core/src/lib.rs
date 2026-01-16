@@ -21,23 +21,23 @@ use crate::uploader::Uploader;
 use crate::uploader::sync::SyncService;
 use crate::clock::LogicalClock;
 use crate::ipc::IpcServer;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Config {
     server: ServerConfig,
     storage: StorageConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct ServerConfig {
     url: String,
     app_code: String,
     app_secret: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct StorageConfig {
     screenshot_dir: String,
     database_path: String,
@@ -55,6 +55,7 @@ struct ServiceContext {
     clock: Arc<LogicalClock>,
     config: Config,
     policy: Arc<RwLock<models::PolicyConfig>>,
+    device_info: models::DeviceInfo,
 }
 
 async fn init_service_context() -> Arc<ServiceContext> {
@@ -69,36 +70,33 @@ async fn init_service_context() -> Arc<ServiceContext> {
         .await
         .expect("Failed to init DB");
 
-    // 3. 初始化上传器
-    let uploader = Arc::new(Uploader::new(
-        &config.server.app_code,
-        &config.server.app_secret,
-        &config.server.url
-    ));
-
-    let clock = Arc::new(LogicalClock::new());
-    let db_arc = Arc::new(db);
-
-    // 获取真实设备信息
+    // 3. 获取真实设备信息
     let mut sys = sysinfo::System::new_all();
     sys.refresh_all();
 
     let host_name = sysinfo::System::host_name().unwrap_or_else(|| "Unknown-Mac".to_string());
-    let mac_addr = mac_address::get_mac_address()
-        .unwrap_or(None)
-        .map(|m| m.to_string())
-        .unwrap_or_else(|| "00:00:00:00:00:00".to_string());
-
+    let mac_addr = get_local_mac();
     let ip_addr = get_local_ip();
     let serial_number = get_macos_serial_number();
 
     let device_info = models::DeviceInfo {
-        pin: serial_number,
+        pin: serial_number.clone(),
         host_id: host_name.clone(),
-        cpe_id: format!("CPE-{}", host_name),
+        cpe_id: serial_number.clone(), // 使用 clone 避免所有权转移
         mac: mac_addr,
         ip: ip_addr,
     };
+
+    // 4. 初始化上传器
+    let uploader = Arc::new(Uploader::new(
+        &config.server.app_code,
+        &config.server.app_secret,
+        &config.server.url,
+        &serial_number
+    ));
+
+    let clock = Arc::new(LogicalClock::new());
+    let db_arc = Arc::new(db);
 
     // 初始化默认策略
     let policy = Arc::new(RwLock::new(models::PolicyConfig {
@@ -106,17 +104,18 @@ async fn init_service_context() -> Arc<ServiceContext> {
         app_blacklist: vec!["clash".to_string(), "v2ray".to_string(), "proxyman".to_string()],
     }));
 
-    // 4. 初始化背景同步服务
+    // 5. 初始化背景同步服务
     let sync_service = SyncService::new(
         db_arc.clone(),
         uploader.clone(),
         clock.clone(),
         policy.clone(),
-        device_info
+        device_info.clone(),
+        config.storage.screenshot_dir.clone(),
     );
     sync_service.start();
 
-    // 5. 启动 IPC 服务
+    // 6. 启动 IPC 服务
     let ipc_server = IpcServer::new(db_arc.clone(), uploader.clone(), RUNTIME.handle().clone());
     ipc_server.start();
 
@@ -126,6 +125,7 @@ async fn init_service_context() -> Arc<ServiceContext> {
         clock,
         config,
         policy,
+        device_info,
     })
 }
 
@@ -152,20 +152,114 @@ fn get_macos_serial_number() -> String {
     "UNKNOWN_SERIAL".to_string()
 }
 
+fn get_primary_interface_name() -> Option<String> {
+    use std::process::Command;
+    let output = Command::new("route")
+        .args(&["-n", "get", "default"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let s = String::from_utf8_lossy(&output.stdout);
+    for line in s.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("interface:") {
+            let iface = rest.trim();
+            if !iface.is_empty() {
+                log::info!("Primary network interface detected: {}", iface);
+                return Some(iface.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn get_ip_for_interface(interface: &str) -> Option<String> {
+    use std::process::Command;
+    let output = Command::new("ipconfig")
+        .args(&["getifaddr", interface])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if ip.is_empty() {
+        None
+    } else {
+        Some(ip)
+    }
+}
+
+fn get_mac_for_interface(interface: &str) -> Option<String> {
+    use std::process::Command;
+    let output = Command::new("ifconfig")
+        .arg(interface)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let s = String::from_utf8_lossy(&output.stdout);
+    for line in s.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("ether ") {
+            let mac = rest.split_whitespace().next().unwrap_or("").trim();
+            if !mac.is_empty() {
+                return Some(mac.to_string());
+            }
+        }
+    }
+    None
+}
+
 fn get_local_ip() -> String {
+    if let Some(interface) = get_primary_interface_name() {
+        if let Some(ip) = get_ip_for_interface(&interface) {
+            log::info!("Local IP resolved via {}: {}", interface, ip);
+            return ip;
+        }
+    }
+
+    // Fallback: derive local IP from a UDP socket without sending packets.
     use std::net::UdpSocket;
-    // 尝试连接到一个公共 IP (不会实际发送数据包) 来确定使用的本地接口 IP
     match UdpSocket::bind("0.0.0.0:0") {
         Ok(socket) => {
-            if let Ok(_) = socket.connect("8.8.8.8:80") {
+            if socket.connect("8.8.8.8:80").is_ok() {
                 if let Ok(addr) = socket.local_addr() {
+                    log::info!("Local IP resolved via UDP fallback: {}", addr.ip());
                     return addr.ip().to_string();
                 }
             }
-        },
+        }
         Err(e) => log::error!("Failed to bind UDP socket for IP detection: {}", e),
     }
+    log::warn!("Local IP fallback to 127.0.0.1");
     "127.0.0.1".to_string()
+}
+
+fn get_local_mac() -> String {
+    if let Some(interface) = get_primary_interface_name() {
+        if let Some(mac) = get_mac_for_interface(&interface) {
+            log::info!("Local MAC resolved via {}: {}", interface, mac);
+            return mac;
+        }
+    }
+
+    mac_address::get_mac_address()
+        .unwrap_or(None)
+        .map(|m| {
+            let mac = m.to_string();
+            log::info!("Local MAC resolved via mac_address: {}", mac);
+            mac
+        })
+        .unwrap_or_else(|| {
+            log::warn!("Local MAC fallback to 00:00:00:00:00:00");
+            "00:00:00:00:00:00".to_string()
+        })
 }
 
 async fn get_service_context() -> Arc<ServiceContext> {
@@ -300,7 +394,7 @@ pub extern "C" fn analyze_enhanced_image(
 
             // 5. 保存图片到本地
             let filename = format!("{}.jpg", hash_string);
-            let save_dir = "/Users/adolf/Desktop/mac-monitor/screenshots";
+            let save_dir = ctx.config.storage.screenshot_dir.as_str();
             let save_path = format!("{}/{}", save_dir, filename);
             if let Err(e) = std::fs::create_dir_all(save_dir) {
                 eprintln!("Failed to create screenshot dir {}: {}", save_dir, e);
@@ -323,10 +417,10 @@ pub extern "C" fn analyze_enhanced_image(
                 image_hash: hash_string,
                 risk_level: if is_sensitive { 1 } else { 0 },
                 ocr_text: ocr_text_str,
-                host_id: "host_123".to_string(),
-                cpe_id: "cpe_123".to_string(),
-                mac: "00:00:00:00:00:00".to_string(),
-                ip: "127.0.0.1".to_string(),
+                host_id: ctx.device_info.host_id.clone(),
+                cpe_id: ctx.device_info.cpe_id.clone(),
+                mac: ctx.device_info.mac.clone(),
+                ip: ctx.device_info.ip.clone(),
             };
 
             if let Err(e) = ctx.db.save_screenshot_log(&log).await {
@@ -340,61 +434,77 @@ pub extern "C" fn analyze_enhanced_image(
     });
 }
 
+
 #[no_mangle]
-pub extern "C" fn log_audit_event(event_json: *const c_char) {
-    if event_json.is_null() {
-        return;
-    }
+pub extern "C" fn register_device(
+    server_ip: *const c_char,
+    server_port: *const c_char,
+    cpe_id: *const c_char,
+    pin: *const c_char
+) -> bool {
+    // 1. Convert C strings to Rust strings
+    let server_ip = if !server_ip.is_null() {
+        unsafe { CStr::from_ptr(server_ip).to_string_lossy().into_owned() }
+    } else { return false; };
 
-    let c_str = unsafe { CStr::from_ptr(event_json) };
-    let r_str = match c_str.to_str() {
-        Ok(s) => s.to_string(),
-        Err(_) => return,
-    };
+    let server_port = if !server_port.is_null() {
+        unsafe { CStr::from_ptr(server_port).to_string_lossy().into_owned() }
+    } else { return false; };
 
-    RUNTIME.spawn(async move {
+    let cpe_id = if !cpe_id.is_null() {
+        unsafe { CStr::from_ptr(cpe_id).to_string_lossy().into_owned() }
+    } else { return false; };
+
+    let pin = if !pin.is_null() {
+        unsafe { CStr::from_ptr(pin).to_string_lossy().into_owned() }
+    } else { return false; };
+
+    log::info!("Registering device: IP={}, Port={}, CPE={}, PIN={}", server_ip, server_port, cpe_id, pin);
+
+    // 2. Construct Base URL
+    let base_url = format!("http://{}:{}", server_ip, server_port);
+    let app_code = "mac_monitor".to_string(); // Default app code
+    let app_secret = pin.clone(); // Use PIN as secret for now
+
+    // 3. Update ServiceContext
+    let rt = &RUNTIME;
+    let res = rt.block_on(async {
         let ctx = get_service_context().await;
-        
-        // 1. 先解析为通用的 Value 以判断类型
-        let v: serde_json::Value = match serde_json::from_str(&r_str) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("Failed to parse log JSON Value: {}", e);
-                return;
+
+        // Update Uploader config
+        ctx.uploader.update_config(&app_code, &app_secret, &base_url, &ctx.device_info.pin);
+
+        // Persist to config.json
+        let config_path = "/Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/config.json";
+
+        // Create new config object
+        let new_config = Config {
+            server: ServerConfig {
+                url: base_url.clone(),
+                app_code: app_code.clone(),
+                app_secret: app_secret.clone(),
+            },
+            storage: StorageConfig {
+                screenshot_dir: "/Users/adolf/Desktop/mac-monitor/screenshots".to_string(), // Keep default or read from existing
+                database_path: ctx.config.storage.database_path.clone(),
             }
         };
 
-        let log_type = v["type"].as_str().unwrap_or("unknown");
-
-        match log_type {
-            "behavior" => {
-                match serde_json::from_str::<BehaviorLog>(&r_str) {
-                    Ok(log) => {
-                        if let Err(e) = ctx.db.save_behavior_log(&log).await {
-                            log::error!("Failed to save behavior log: {}", e);
-                        } else {
-                            log::info!("🛡 Behavior log saved: {} - {}", log.op_type, log.proc);
-                        }
-                    }
-                    Err(e) => log::error!("Failed to parse BehaviorLog: {}", e),
+        match serde_json::to_string_pretty(&new_config) {
+            Ok(json) => {
+                if let Err(e) = fs::write(config_path, json) {
+                    log::error!("Failed to write config.json: {}", e);
+                    return false;
                 }
             }
-            _ => {
-                // 默认为审计日志 (exec, write, flow 等)
-                match serde_json::from_str::<AuditLog>(&r_str) {
-                    Ok(log) => {
-                        if let Err(e) = ctx.db.save_audit_log(&log).await {
-                            log::error!("Failed to save audit log: {}", e);
-                        } else {
-                            log::info!("Audit log saved: {}", log.id);
-                        }
-                    }
-                    Err(e) => {
-                        // 如果还是失败，尝试作为简单的 BehaviorLog 解析 (兜底)
-                        log::error!("Failed to parse AuditLog: {}. Payload: {}", e, r_str);
-                    }
-                }
+            Err(e) => {
+                log::error!("Failed to serialize config: {}", e);
+                return false;
             }
         }
+
+        true
     });
+
+    res
 }

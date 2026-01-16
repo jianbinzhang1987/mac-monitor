@@ -46,7 +46,21 @@ public class MonitorLogBehavior extends BaseEntity {
 
     /** 风险等级 (0-2) */
     @Excel(name = "风险等级")
+    @com.fasterxml.jackson.annotation.JsonProperty("risk_level")
     private Integer riskLevel;
+
+    /** 主机ID */
+    @Excel(name = "主机ID")
+    @com.fasterxml.jackson.annotation.JsonProperty("host_id")
+    private String hostId;
+
+    /** MAC地址 */
+    @Excel(name = "MAC地址")
+    private String mac;
+
+    /** IP地址 */
+    @Excel(name = "IP地址")
+    private String ip;
 
     public void setLogId(Long logId) {
         this.logId = logId;
@@ -104,6 +118,30 @@ public class MonitorLogBehavior extends BaseEntity {
         return riskLevel;
     }
 
+    public void setHostId(String hostId) {
+        this.hostId = hostId;
+    }
+
+    public String getHostId() {
+        return hostId;
+    }
+
+    public void setMac(String mac) {
+        this.mac = mac;
+    }
+
+    public String getMac() {
+        return mac;
+    }
+
+    public void setIp(String ip) {
+        this.ip = ip;
+    }
+
+    public String getIp() {
+        return ip;
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
@@ -114,6 +152,9 @@ public class MonitorLogBehavior extends BaseEntity {
                 .append("processName", getProcessName())
                 .append("detail", getDetail())
                 .append("riskLevel", getRiskLevel())
+                .append("hostId", getHostId())
+                .append("mac", getMac())
+                .append("ip", getIp())
                 .append("createTime", getCreateTime())
                 .toString();
     }

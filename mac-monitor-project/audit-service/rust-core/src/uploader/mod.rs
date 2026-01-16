@@ -2,14 +2,20 @@ pub mod sync;
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub struct Uploader {
-    client: Client,
+#[derive(Debug, Clone)]
+struct UploaderConfig {
     app_code: String,
     app_secret: String,
     base_url: String,
+    serial_number: String,
+}
+
+pub struct Uploader {
+    client: Client,
+    config: RwLock<UploaderConfig>,
     visit_token: Arc<Mutex<Option<String>>>,
 }
 
@@ -59,50 +65,73 @@ pub struct LoginData {
 }
 
 impl Uploader {
-    pub fn new(app_code: &str, app_secret: &str, base_url: &str) -> Self {
+    pub fn new(app_code: &str, app_secret: &str, base_url: &str, serial_number: &str) -> Self {
         Self {
             client: Client::new(),
-            app_code: app_code.to_string(),
-            app_secret: app_secret.to_string(),
-            base_url: base_url.to_string(),
+            config: RwLock::new(UploaderConfig {
+                app_code: app_code.to_string(),
+                app_secret: app_secret.to_string(),
+                base_url: base_url.to_string(),
+                serial_number: serial_number.to_string(),
+            }),
             visit_token: Arc::new(Mutex::new(None)),
         }
     }
 
-    async fn get_token(&self) -> Result<String, String> {
+    pub fn update_config(&self, app_code: &str, app_secret: &str, base_url: &str, serial_number: &str) {
+        let mut config = self.config.write().unwrap();
+        config.app_code = app_code.to_string();
+        config.app_secret = app_secret.to_string();
+        config.base_url = base_url.to_string();
+        config.serial_number = serial_number.to_string();
+
+        // Clear cached token on config change
+        let mut token = self.visit_token.lock().unwrap();
+        *token = None;
+    }
+
+    async fn get_token(&self) -> String {
+        let (base_url, serial_number) = {
+            let config = self.config.read().unwrap();
+            (config.base_url.clone(), config.serial_number.clone())
+        };
+
         {
             let token = self.visit_token.lock().unwrap();
             if let Some(t) = token.as_ref() {
-                return Ok(t.clone());
+                return t.clone();
             }
         }
 
-        // 调用登录接口获取真实 Token
+        // 调用登录接口尝试获取 Token (即使失败也继续，因为服务器现在允许匿名)
         let login_info = MonitorDeviceLogin {
-            serial_number: "MAC_SN_123456".to_string(), // TODO: 获取真实序列号
-            device_name: "Adolf's MacBook".to_string(),
+            serial_number,
+            device_name: "Mac-Client".to_string(),
             os_version: "macOS 15.1".to_string(),
             app_version: "0.1.0".to_string(),
         };
 
-        let url = format!("{}/api/v1/login", self.base_url);
+        let url = format!("{}/api/v1/login", base_url);
         let response = self.client.post(&url)
             .json(&login_info)
             .send()
-            .await
-            .map_err(|e| format!("Login request failed: {}", e))?;
+            .await;
 
-        let res: LoginResponse = response.json().await.map_err(|e| format!("Failed to parse login response: {}", e))?;
-
-        if res.code == 200 || res.code == 0 {
-            if let Some(data) = res.data {
-                let mut token_lock = self.visit_token.lock().unwrap();
-                *token_lock = Some(data.token.clone());
-                return Ok(data.token);
+        match response {
+            Ok(resp) => {
+                if let Ok(res) = resp.json::<LoginResponse>().await {
+                    if (res.code == 200 || res.code == 0) && res.data.is_some() {
+                        let token = res.data.unwrap().token;
+                        let mut token_lock = self.visit_token.lock().unwrap();
+                        *token_lock = Some(token.clone());
+                        return token;
+                    }
+                }
             }
+            Err(e) => eprintln!("Optional login failed: {}", e),
         }
 
-        Err(format!("Login failed: {}", res.msg))
+        "".to_string() // 登录失败返回空字符串，匿名访问
     }
 
     fn generate_signature(&self, _timestamp: u64, _nonce: &str) -> String {
@@ -110,11 +139,12 @@ impl Uploader {
     }
 
     pub async fn upload_data<T: Serialize>(&self, endpoint: &str, data: &T) -> Result<(), String> {
-        let token = self.get_token().await?;
-        let url = format!("{}{}", self.base_url, endpoint);
+        let base_url = {
+            self.config.read().unwrap().base_url.clone()
+        };
+        let url = format!("{}{}", base_url, endpoint);
 
         let response = self.client.post(&url)
-            .header("Authorization", format!("Bearer {}", token))
             .json(data)
             .send()
             .await
@@ -130,7 +160,6 @@ impl Uploader {
     }
 
     pub async fn upload_file(&self, file_path: &str) -> Result<String, String> {
-        let token = self.get_token().await?;
         let file_content = std::fs::read(file_path).map_err(|e| e.to_string())?;
         let file_name = std::path::Path::new(file_path)
             .file_name()
@@ -145,9 +174,11 @@ impl Uploader {
 
         let form = reqwest::multipart::Form::new().part("file", part);
 
-        let url = format!("{}/api/v1/upload/screenshot", self.base_url);
+        let base_url = {
+            self.config.read().unwrap().base_url.clone()
+        };
+        let url = format!("{}/api/v1/upload/screenshot", base_url);
         let response = self.client.post(&url)
-            .header("Authorization", format!("Bearer {}", token))
             .multipart(form)
             .send()
             .await
@@ -162,7 +193,10 @@ impl Uploader {
     }
 
     pub async fn get_server_time(&self) -> Result<u64, String> {
-        let response = self.client.get(format!("{}/httpsaudit/zf/api/third/server/time", self.base_url))
+        let base_url = {
+            self.config.read().unwrap().base_url.clone()
+        };
+        let response = self.client.get(format!("{}/httpsaudit/zf/api/third/server/time", base_url))
             .send()
             .await
             .map_err(|e| e.to_string())?;
@@ -182,15 +216,25 @@ impl Uploader {
     }
 
     pub async fn heartbeat(&self, current_version: &str) -> Result<crate::models::HeartbeatResponse, String> {
+        let (base_url, serial_number) = {
+            let config = self.config.read().unwrap();
+            (config.base_url.clone(), config.serial_number.clone())
+        };
+
         let data = serde_json::json!({
+            "serialNumber": serial_number,
             "app_version": current_version,
             "timestamp": SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
         });
-        
-        let token = self.get_token().await?;
-        let response = self.client.post(format!("{}/api/v1/heartbeat", self.base_url))
-            .header("visit-token", token)
-            .json(&data)
+
+        let token = self.get_token().await;
+
+        let mut request = self.client.post(format!("{}/api/v1/heartbeat", base_url));
+        if !token.is_empty() {
+            request = request.header("visit-token", token);
+        }
+
+        let response = request.json(&data)
             .send()
             .await
             .map_err(|e| e.to_string())?;
@@ -199,10 +243,17 @@ impl Uploader {
     }
 
     pub async fn get_pop_list(&self) -> Result<Vec<crate::models::PopNode>, String> {
-        let token = self.get_token().await?;
-        let response = self.client.get(format!("{}/api/v1/pop/list", self.base_url))
-            .header("visit-token", token)
-            .send()
+        let token = self.get_token().await;
+        let base_url = {
+            self.config.read().unwrap().base_url.clone()
+        };
+
+        let mut request = self.client.get(format!("{}/api/v1/pop/list", base_url));
+        if !token.is_empty() {
+            request = request.header("visit-token", token);
+        }
+
+        let response = request.send()
             .await
             .map_err(|e| e.to_string())?;
 
@@ -216,7 +267,10 @@ impl Uploader {
     }
 
     pub async fn check_update(&self) -> Result<crate::models::UpdateInfo, String> {
-        let response = self.client.get(format!("{}/api/v1/maintenance/update", self.base_url))
+        let base_url = {
+            self.config.read().unwrap().base_url.clone()
+        };
+        let response = self.client.get(format!("{}/api/v1/maintenance/update", base_url))
             .send()
             .await
             .map_err(|e| e.to_string())?;
@@ -231,10 +285,21 @@ impl Uploader {
     }
 
     pub async fn get_config(&self) -> Result<crate::models::PolicyConfig, String> {
-        let token = self.get_token().await?;
-        let response = self.client.get(format!("{}/api/v1/config/policy", self.base_url))
-            .header("Authorization", format!("Bearer {}", token))
-            .send()
+        let (base_url, serial_number) = {
+            let config = self.config.read().unwrap();
+            (config.base_url.clone(), config.serial_number.clone())
+        };
+
+        let token = self.get_token().await;
+
+        let mut request = self.client.get(format!("{}/api/v1/config/policy", base_url))
+            .query(&[("serialNumber", &serial_number)]);
+
+        if !token.is_empty() {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = request.send()
             .await
             .map_err(|e| e.to_string())?;
 
@@ -247,7 +312,10 @@ impl Uploader {
     }
 
     pub async fn get_cert_info(&self) -> Result<crate::models::CertInfo, String> {
-        let response = self.client.get(format!("{}/api/v1/maintenance/cert", self.base_url))
+        let base_url = {
+            self.config.read().unwrap().base_url.clone()
+        };
+        let response = self.client.get(format!("{}/api/v1/maintenance/cert", base_url))
             .send()
             .await
             .map_err(|e| e.to_string())?;

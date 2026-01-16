@@ -68,28 +68,38 @@ class AuditIPCServer {
     }
     
     private func handleClient(_ fd: Int32) {
+        print("🤝 New IPC connection accepted (fd: \(fd))")
         DispatchQueue.global(qos: .utility).async {
             var buffer = [UInt8](repeating: 0, count: 65536)
             let bytesRead = read(fd, &buffer, buffer.count)
-            
+
             var response = """
             {"status":"error","message":"Invalid request"}
             """
-            
+
             if bytesRead > 0 {
                 let data = Data(buffer.prefix(bytesRead))
+                let requestStr = String(data: data, encoding: .utf8) ?? "binary data"
+                print("📥 Received raw IPC data (\(bytesRead) bytes): \(requestStr)")
+
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     response = self.processCommand(json, clientFd: fd)
+                } else {
+                    print("⚠️ Failed to parse JSON from IPC data")
                 }
+            } else {
+                print("⚠️ Read 0 bytes from IPC connection")
             }
-            
+
             // 发送响应
+            print("📤 Sending IPC response: \(response)")
             response.withCString { ptr in
                 let len = strlen(ptr)
                 write(fd, ptr, len)
             }
-            
+
             close(fd)
+            print("👋 IPC connection closed (fd: \(fd))")
         }
     }
     
@@ -108,9 +118,28 @@ class AuditIPCServer {
         case "register":
             // 处理注册请求
             print("✅ Processing register command")
-            return """
-            {"status":"ok","message":"Registration processed","payload":null}
-            """
+            if let payloadDict = payload as? [String: Any],
+               let serverIp = payloadDict["server_ip"] as? String,
+               let serverPort = payloadDict["server_port"] as? String,
+               let cpeId = payloadDict["cpe_id"] as? String,
+               let pin = payloadDict["pin"] as? String {
+
+                let success = rust_register_device(serverIp, serverPort, cpeId, pin)
+
+                if success {
+                    return """
+                    {"status":"ok","message":"Registration successful","payload":null}
+                    """
+                } else {
+                    return """
+                    {"status":"error","message":"Registration failed in core"}
+                    """
+                }
+            } else {
+                return """
+                {"status":"error","message":"Invalid payload for register"}
+                """
+            }
             
         case "login":
             // 处理登录请求

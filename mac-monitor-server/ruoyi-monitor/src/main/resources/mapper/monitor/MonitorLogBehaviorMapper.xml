@@ -12,11 +12,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="processName"    column="process_name"    />
         <result property="detail"    column="detail"    />
         <result property="riskLevel"    column="risk_level"    />
+        <result property="hostId"    column="host_id"    />
+        <result property="mac"    column="mac"    />
+        <result property="ip"    column="ip"    />
         <result property="createTime"    column="create_time"    />
     </resultMap>
 
     <sql id="selectMonitorLogBehaviorVo">
-        select log_id, serial_number, event_time, event_type, process_name, detail, risk_level, create_time from monitor_log_behavior
+        select log_id, serial_number, event_time, event_type, process_name, detail, risk_level, host_id, mac, ip, create_time from monitor_log_behavior
     </sql>
 
     <select id="selectMonitorLogBehaviorList" parameterType="MonitorLogBehavior" resultMap="MonitorLogBehaviorResult">
@@ -26,6 +29,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="eventType != null  and eventType != ''"> and event_type = #{eventType}</if>
             <if test="processName != null  and processName != ''"> and process_name like concat('%', #{processName}, '%')</if>
             <if test="riskLevel != null "> and risk_level = #{riskLevel}</if>
+            <if test="hostId != null  and hostId != ''"> and host_id = #{hostId}</if>
+            <if test="mac != null  and mac != ''"> and mac = #{mac}</if>
+            <if test="ip != null  and ip != ''"> and ip = #{ip}</if>
         </where>
         order by event_time desc
     </select>
@@ -44,6 +50,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processName != null">process_name,</if>
             <if test="detail != null">detail,</if>
             <if test="riskLevel != null">risk_level,</if>
+            <if test="hostId != null">host_id,</if>
+            <if test="mac != null">mac,</if>
+            <if test="ip != null">ip,</if>
             <if test="createTime != null">create_time,</if>
          </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
@@ -53,6 +62,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processName != null">#{processName},</if>
             <if test="detail != null">#{detail},</if>
             <if test="riskLevel != null">#{riskLevel},</if>
+            <if test="hostId != null">#{hostId},</if>
+            <if test="mac != null">#{mac},</if>
+            <if test="ip != null">#{ip},</if>
             <if test="createTime != null">#{createTime},</if>
          </trim>
     </insert>

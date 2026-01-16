@@ -49,6 +49,31 @@ public class MonitorLogScreenshot extends BaseEntity {
     @com.fasterxml.jackson.annotation.JsonProperty("is_sensitive")
     private Integer riskLevel;
 
+    /** 主机ID */
+    @Excel(name = "主机ID")
+    @com.fasterxml.jackson.annotation.JsonProperty("host_id")
+    private String hostId;
+
+    /** MAC地址 */
+    @Excel(name = "MAC地址")
+    @com.fasterxml.jackson.annotation.JsonProperty("mac")
+    private String mac;
+
+    /** IP地址 */
+    @Excel(name = "IP地址")
+    @com.fasterxml.jackson.annotation.JsonProperty("ip")
+    private String ip;
+
+    /** 应用名称 */
+    @Excel(name = "应用名称")
+    @com.fasterxml.jackson.annotation.JsonProperty("app_name")
+    private String appName;
+
+    /** 图片哈希 */
+    @Excel(name = "图片哈希")
+    @com.fasterxml.jackson.annotation.JsonProperty("image_hash")
+    private String imageHash;
+
     public void setLogId(Long logId) {
         this.logId = logId;
     }
@@ -105,6 +130,46 @@ public class MonitorLogScreenshot extends BaseEntity {
         return riskLevel;
     }
 
+    public void setHostId(String hostId) {
+        this.hostId = hostId;
+    }
+
+    public String getHostId() {
+        return hostId;
+    }
+
+    public void setMac(String mac) {
+        this.mac = mac;
+    }
+
+    public String getMac() {
+        return mac;
+    }
+
+    public void setIp(String ip) {
+        this.ip = ip;
+    }
+
+    public String getIp() {
+        return ip;
+    }
+
+    public void setAppName(String appName) {
+        this.appName = appName;
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setImageHash(String imageHash) {
+        this.imageHash = imageHash;
+    }
+
+    public String getImageHash() {
+        return imageHash;
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
@@ -115,6 +180,11 @@ public class MonitorLogScreenshot extends BaseEntity {
                 .append("filePath", getFilePath())
                 .append("ocrText", getOcrText())
                 .append("riskLevel", getRiskLevel())
+                .append("hostId", getHostId())
+                .append("mac", getMac())
+                .append("ip", getIp())
+                .append("appName", getAppName())
+                .append("imageHash", getImageHash())
                 .append("createTime", getCreateTime())
                 .toString();
     }

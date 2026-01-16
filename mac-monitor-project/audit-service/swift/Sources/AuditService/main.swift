@@ -12,7 +12,7 @@ func startAuditServices() {
     rust_init_audit_core()
 
     // Start IPC Server
-    AuditIPCServer.shared.start()
+    // AuditIPCServer.shared.start()
     
     // Start Screen Capturer (if macOS 12.3+)
     if #available(macOS 12.3, *) {

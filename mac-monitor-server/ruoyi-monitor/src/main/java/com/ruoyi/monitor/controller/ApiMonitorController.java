@@ -152,6 +152,43 @@ public class ApiMonitorController extends BaseController {
         return AjaxResult.success(data);
     }
 
+    /**
+     * 获取策略配置 (黑名单等)
+     * 对应 Rust 客户端: /api/v1/config/policy
+     */
+    @GetMapping("/config/policy")
+    public AjaxResult getPolicyConfig() {
+        // 简单实现：获取默认策略。如需针对设备，可扩展支持传参 serialNumber
+        MonitorPolicy policy = monitorPolicyService.selectDefaultPolicy();
+        if (policy == null) {
+            // 如果没有默认策略，返回空配置以免客户端报错
+            Map<String, Object> emptyData = new HashMap<>();
+            emptyData.put("process_blacklist", new String[]{});
+            emptyData.put("app_blacklist", new String[]{});
+            return AjaxResult.success(emptyData);
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        try {
+            // 解析 agentSettings 中的黑名单配置
+            if (policy.getAgentSettings() != null) {
+                com.alibaba.fastjson2.JSONObject settings = JSON.parseObject(policy.getAgentSettings());
+                if (settings != null) {
+                    data.put("process_blacklist", settings.getJSONArray("process_blacklist"));
+                    data.put("app_blacklist", settings.getJSONArray("app_blacklist"));
+                }
+            }
+        } catch (Exception e) {
+            logger.error("解析策略配置失败", e);
+        }
+
+        // 确保字段存在
+        data.putIfAbsent("process_blacklist", new String[]{});
+        data.putIfAbsent("app_blacklist", new String[]{});
+
+        return AjaxResult.success(data);
+    }
+
     @Autowired
     private com.ruoyi.monitor.service.IMonitorLogTrafficService monitorLogTrafficService;
 
@@ -166,6 +203,17 @@ public class ApiMonitorController extends BaseController {
      */
     @PostMapping("/log/audit")
     public AjaxResult uploadAuditLog(@RequestBody com.ruoyi.monitor.domain.MonitorLogTraffic log) {
+        if (log.getSerialNumber() != null) {
+            MonitorDevice device = monitorDeviceService.selectMonitorDeviceBySerialNumber(log.getSerialNumber());
+            // 如果设备不存在，可以考虑先自动注册
+            if (device == null) {
+                device = new MonitorDevice();
+                device.setSerialNumber(log.getSerialNumber());
+                device.setDeviceName("Auto Registered");
+                monitorDeviceService.registerOrUpdate(device);
+                device = monitorDeviceService.selectMonitorDeviceBySerialNumber(log.getSerialNumber());
+            }
+        }
         monitorLogTrafficService.insertMonitorLogTraffic(log);
         return AjaxResult.success();
     }
@@ -175,6 +223,15 @@ public class ApiMonitorController extends BaseController {
      */
     @PostMapping("/log/behavior")
     public AjaxResult uploadBehaviorLog(@RequestBody com.ruoyi.monitor.domain.MonitorLogBehavior log) {
+        if (log.getSerialNumber() != null) {
+            MonitorDevice device = monitorDeviceService.selectMonitorDeviceBySerialNumber(log.getSerialNumber());
+            if (device == null) {
+                device = new MonitorDevice();
+                device.setSerialNumber(log.getSerialNumber());
+                device.setDeviceName("Auto Registered");
+                monitorDeviceService.registerOrUpdate(device);
+            }
+        }
         monitorLogBehaviorService.insertMonitorLogBehavior(log);
         return AjaxResult.success();
     }
@@ -184,6 +241,25 @@ public class ApiMonitorController extends BaseController {
      */
     @PostMapping("/log/screenshot")
     public AjaxResult uploadScreenshotLog(@RequestBody com.ruoyi.monitor.domain.MonitorLogScreenshot log) {
+        if (log.getSerialNumber() != null) {
+            MonitorDevice device = monitorDeviceService.selectMonitorDeviceBySerialNumber(log.getSerialNumber());
+            if (device != null) {
+                log.setDeviceId(device.getDeviceId());
+            } else {
+                // 自动注册设备
+                MonitorDevice newDevice = new MonitorDevice();
+                newDevice.setSerialNumber(log.getSerialNumber());
+                newDevice.setDeviceName(log.getHostId() != null ? log.getHostId() : "Auto Registered");
+                newDevice.setRegisteredIp(log.getIp());
+                monitorDeviceService.registerOrUpdate(newDevice);
+
+                // 重新获取以获取 ID
+                device = monitorDeviceService.selectMonitorDeviceBySerialNumber(log.getSerialNumber());
+                if (device != null) {
+                    log.setDeviceId(device.getDeviceId());
+                }
+            }
+        }
         monitorLogScreenshotService.insertMonitorLogScreenshot(log);
         return AjaxResult.success();
     }

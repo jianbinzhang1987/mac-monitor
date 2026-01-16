@@ -65,14 +65,21 @@ struct AuditPolicyPayload {
 
 async fn send_ipc_command(command: &str, payload: serde_json::Value) -> Result<String, String> {
     let socket_path = "/tmp/mac_monitor_audit.sock";
-    
+    println!("📡 Sending IPC command: {} to {}", command, socket_path);
+
     // 检查套接字文件是否存在
     if !std::path::Path::new(socket_path).exists() {
-        return Err("审计服务未启动（套接字文件不存在）".to_string());
+        let err = "审计服务未启动（套接字文件不存在）".to_string();
+        eprintln!("❌ IPC Error: {}", err);
+        return Err(err);
     }
 
     let mut stream = LocalSocketStream::connect(socket_path)
-        .map_err(|e| format!("无法连接到审计服务: {}", e))?;
+        .map_err(|e| {
+            let err = format!("无法连接到审计服务: {}", e);
+            eprintln!("❌ IPC Connection Error: {}", err);
+            err
+        })?;
 
     let full_command = serde_json::json!({
         "command": command,
@@ -80,20 +87,32 @@ async fn send_ipc_command(command: &str, payload: serde_json::Value) -> Result<S
     });
 
     let cmd_str = full_command.to_string();
+    println!("📤 Writing to socket: {}", cmd_str);
     stream.write_all(cmd_str.as_bytes())
-        .map_err(|e| format!("发送指令失败: {}", e))?;
-    
-    // 发送结束符或关闭写端（取决于服务端实现，这里假设服务端读到 JSON 后会处理）
+        .map_err(|e| {
+            let err = format!("发送指令失败: {}", e);
+            eprintln!("❌ IPC Write Error: {}", err);
+            err
+        })?;
+
     stream.flush().map_err(|e| e.to_string())?;
 
     let mut response = String::new();
+    println!("📥 Waiting for IPC response...");
     stream.read_to_string(&mut response)
-        .map_err(|e| format!("读取响应失败: {}", e))?;
+        .map_err(|e| {
+            let err = format!("读取响应失败: {}", e);
+            eprintln!("❌ IPC Read Error: {}", err);
+            err
+        })?;
 
     if response.is_empty() {
-        return Err("审计服务响应为空".to_string());
+        let err = "审计服务响应为空".to_string();
+        eprintln!("❌ IPC Empty Response");
+        return Err(err);
     }
 
+    println!("✅ Received IPC response: {}", response);
     Ok(response)
 }
 
