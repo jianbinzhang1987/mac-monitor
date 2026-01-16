@@ -11,12 +11,17 @@ pub struct AuditLog {
     #[serde(rename = "method_type")]
     pub method_type: String,
     pub domain: String,
-    #[serde(rename = "process_name")]
+    #[serde(rename = "process_name", default = "default_process_name")]
     pub process_name: String,
+    #[serde(default)]
     pub risk_level: i32,
     pub ip: String,
     pub mac: String,
     pub host_id: String,
+}
+
+fn default_process_name() -> String {
+    "unknown".to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize)]

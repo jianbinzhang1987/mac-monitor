@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>AuditService</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.mac-monitor.audit-service</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Mac Monitor Audit Service</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.3</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+
+	<!-- 屏幕录制权限描述 - 必须添加此项才能在系统设置中显示 -->
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Mac Monitor 需要录屏权限来监控终端活动、捕获屏幕内容并进行 OCR 文字识别，以实现安全审计功能。</string>
+
+	<!-- 其他可能需要的权限描述 -->
+	<key>NSSystemAdministrationUsageDescription</key>
+	<string>Mac Monitor 需要系统管理权限来监控进程活动和网络连接。</string>
+</dict>
+</plist>

@@ -32,6 +32,21 @@ class ProxyManager {
     }
     
     private func startTrafficProxy() {
+        // Check if already running
+        let pgrep = Process()
+        pgrep.launchPath = "/usr/bin/pgrep"
+        pgrep.arguments = ["-x", "traffic-proxy"]
+        let pipe = Pipe()
+        pgrep.standardOutput = pipe
+        pgrep.launch()
+        pgrep.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if !data.isEmpty {
+            print("traffic-proxy is already running.")
+            return
+        }
+
         // Assume traffic-proxy is in the same directory as this tool
         let currentUrl = URL(fileURLWithPath: CommandLine.arguments[0])
         let binDir = currentUrl.deletingLastPathComponent()

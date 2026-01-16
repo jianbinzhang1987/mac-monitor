@@ -144,7 +144,13 @@ impl Uploader {
         };
         let url = format!("{}{}", base_url, endpoint);
 
-        let response = self.client.post(&url)
+        let token = self.get_token().await;
+        let mut request = self.client.post(&url);
+        if !token.is_empty() {
+            request = request.header("visit-token", token);
+        }
+
+        let response = request
             .json(data)
             .send()
             .await

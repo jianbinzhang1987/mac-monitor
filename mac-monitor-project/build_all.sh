@@ -143,7 +143,7 @@ fi
 echo "✅ Network Extension 构建成功: $APPEX_PATH"
 
 
-# 3. 构建 AuditService (Sidecar)
+# 3. 构建 AuditService (Sidecar as .app bundle)
 # ------------------------------------------
 echo ""
 echo "🛡️  [3/4] 构建 AuditService (Sidecar)..."
@@ -155,13 +155,64 @@ echo "✅ AuditService 编译完成"
 SIDECAR_DIR="$PROJECT_ROOT/gui-app/src-tauri/bin"
 mkdir -p "$SIDECAR_DIR"
 
-# 复制并重命名二进制文件
+# 查找二进制文件
 SOURCE_BIN="$PROJECT_ROOT/audit-service/swift/.build/release/AuditService"
 if [ ! -f "$SOURCE_BIN" ]; then
     # 尝试查找特定架构下的构建
     SOURCE_BIN=$(find .build -name AuditService -type f | grep release | head -n 1)
 fi
 
+# 创建 .app bundle 结构 (用于录屏权限识别)
+echo "📦 正在创建 AuditService.app bundle..."
+APP_BUNDLE="$SIDECAR_DIR/AuditService.app"
+rm -rf "$APP_BUNDLE"
+mkdir -p "$APP_BUNDLE/Contents/MacOS"
+mkdir -p "$APP_BUNDLE/Contents/Resources"
+
+# 复制二进制文件
+cp "$SOURCE_BIN" "$APP_BUNDLE/Contents/MacOS/AuditService"
+chmod +x "$APP_BUNDLE/Contents/MacOS/AuditService"
+
+# 创建 Info.plist
+cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>AuditService</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.mac-monitor.audit-service</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Mac Monitor Audit Service</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.3</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Mac Monitor 需要录屏权限来监控终端活动、捕获屏幕内容并进行 OCR 文字识别，以实现安全审计功能。</string>
+	<key>NSSystemAdministrationUsageDescription</key>
+	<string>Mac Monitor 需要系统管理权限来监控进程活动和网络连接。</string>
+</dict>
+</plist>
+EOF
+
+# Ad-hoc 签名 (确保系统识别)
+codesign --force --deep --sign - "$APP_BUNDLE" 2>/dev/null || echo "⚠️  签名失败，继续..."
+
+echo "✅ AuditService.app bundle 创建成功"
+
+# 同时保留旧的命名方式作为 sidecar (用于兼容性)
 TARGET_BIN="$SIDECAR_DIR/AuditService-$TARGET_TRIPLE"
 cp "$SOURCE_BIN" "$TARGET_BIN"
 chmod +x "$TARGET_BIN"
@@ -206,10 +257,10 @@ fi
 
 echo "🚀 开始 Tauri 构建..."
 echo "🚀 开始 Tauri 构建..."
-npm run tauri build -- --bundles app > tauri_build.log 2>&1 || { echo "❌ Tauri 构建失败"; cat tauri_build.log; exit 1; }
+npm run tauri build > tauri_build.log 2>&1 || { echo "❌ Tauri 构建失败"; cat tauri_build.log; exit 1; }
 
 # 嵌入 Network Extension
-APP_BUNDLE_PATH="$PROJECT_ROOT/gui-app/src-tauri/target/release/bundle/macos/mac-monitor-gui.app"
+APP_BUNDLE_PATH="$PROJECT_ROOT/gui-app/src-tauri/target/release/bundle/macos/Mac Monitor.app"
 PLUGINS_DIR="$APP_BUNDLE_PATH/Contents/PlugIns"
 
 echo "🧩 正在嵌入 Network Extension..."
@@ -217,8 +268,24 @@ mkdir -p "$PLUGINS_DIR"
 cp -r "$APPEX_PATH" "$PLUGINS_DIR/"
 
 echo ""
-echo "🎉 ========================================"
-echo "✅ 全流程打包完成!"
-echo "📂 应用包位置: $APP_BUNDLE_PATH"
+echo "💿 DMG 安装包位置: output/Mac Monitor.dmg"
+
+# Generate DMG using appdmg (npx) for correct layout
+echo "📀 正在生成 DMG (修复图标重叠)..."
+if command -v npm >/dev/null; then
+    npx -y appdmg "$PROJECT_ROOT/dmg-config.json" "$PROJECT_ROOT/output/Mac Monitor.dmg" || echo "⚠️ appdmg 生成失败"
+else
+    echo "⚠️ npm 未安装，跳过 DMG 生成"
+fi
+
+# Copy App to output
+mkdir -p "$PROJECT_ROOT/output"
+# cp -r "$APP_BUNDLE_PATH" "$PROJECT_ROOT/output/"
+
+# Cleanup previous dmg copy attemp if any (we now generate directly to output)
+# cp "${APP_BUNDLE_PATH%/*/*}/dmg/"*.dmg "$PROJECT_ROOT/output/" 2>/dev/null || true
+
+echo "📦 已发布到 output/ 目录下"
+
 echo "⚠️  注意: 由于是无签名/Ad-hoc构建，Network Extension 可能需要关闭 SIP 或手动签名才能加载。"
 echo "🎉 ========================================"

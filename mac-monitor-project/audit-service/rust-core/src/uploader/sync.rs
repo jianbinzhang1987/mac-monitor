@@ -80,7 +80,7 @@ impl SyncService {
     }
 
     async fn sync_logs(&self) -> Result<(), String> {
-        // 1. 同步审计日志
+        // 1. 同步审计日志 (即流量探测日志)
         let audit_logs = self.db.get_unsent_audit_logs().await.map_err(|e| e.to_string())?;
         for log in audit_logs {
             match self.uploader.upload_data("/api/v1/log/audit", &log).await {

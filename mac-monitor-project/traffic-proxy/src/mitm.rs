@@ -170,6 +170,7 @@ impl MitmProxy {
             req_time,
             resp_time,
             method_type: method.to_string(),
+            domain: domain.to_string(),
             ip: device_info.ip,
             mac: device_info.mac,
             cpe_id: device_info.cpe_id,
@@ -229,7 +230,23 @@ fn should_log_request(domain: &str, url: &str) -> bool {
                 matched = true; break;
             }
         }
-        if !matched { return false; }
+        if !matched {
+            // Hardcoded domains for auto-recording
+            if domain_lower == "google.com" || domain_lower.ends_with(".google.com") ||
+               domain_lower == "github.com" || domain_lower.ends_with(".github.com") {
+                // matched = true; 
+            } else {
+                return false;
+            }
+        }
+    } else {
+        // If no target domains are set, we still check the hardcoded defaults
+        if !(domain_lower == "google.com" || domain_lower.ends_with(".google.com") ||
+             domain_lower == "github.com" || domain_lower.ends_with(".github.com")) {
+             // If not in hardcoded list and no policy, maybe log everything? 
+             // The requirement says "DOMAIN IS *.google.com and *.github.com... record to local table"
+             // This suggests we should at least record these.
+        }
     }
 
     if !policy.white_domains.is_empty() {
@@ -271,6 +288,7 @@ pub struct AuditLog {
     pub pin_number: String,
     pub id: String,
     pub url: String,
+    pub domain: String,
     pub req_time: String,
     pub resp_time: String,
     pub method_type: String,

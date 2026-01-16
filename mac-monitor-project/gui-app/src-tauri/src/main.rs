@@ -9,6 +9,8 @@ use tauri::{
     Manager, State,
 };
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_autostart::ManagerExt;
 use tokio::time::{self, Duration};
 use interprocess::local_socket::LocalSocketStream;
 use std::io::{Read, Write};
@@ -362,6 +364,62 @@ fn start_heartbeat_loop(app_handle: tauri::AppHandle) {
     });
 }
 
+// Helper to run vpn-helper with sudo via AppleScript
+fn run_vpn_helper_auth(arg: &str, handle: tauri::AppHandle) -> Result<String, String> {
+    let bundle_path = handle.path().resource_dir().map_err(|e| e.to_string())?;
+    // Expected path in production bundle: Contents/Resources/bin/vpn-helper-x86_64-apple-darwin
+    // Or externalBin dir. 
+    // Sidecar means binaries are often side-by-side with main binary in MacOS/ or in Resources/bin
+    
+    // For simplicity in this iteration, we try to find it relative to current execution
+    // But since we are calling it with sudo via script, absolute path is safest.
+    
+    // Let's resolve the path to the sidecar "vpn-helper"
+    let sidecar_path = std::env::current_exe()
+        .map_err(|e| e.to_string())?
+        .parent()
+        .unwrap()
+        .join("vpn-helper"); // The sidecar tool name (without arch suffix usually if renamed by tauri, but we manually copied it)
+
+    // Actually, we should just assume it's where we put it.
+    // In dev: gui-app/src-tauri/bin/vpn-helper...
+    // In prod: Contents/MacOS/vpn-helper
+    
+    // Let's rely on finding it next to the app binary which is robust enough for now
+    let helper_path = sidecar_path.to_string_lossy().to_string();
+    
+    // The command to run
+    let script = format!(
+        "do shell script \"'{}' {}\" with administrator privileges",
+        helper_path, arg
+    );
+
+    println!("🔑 Requesting privilege for: {}", script);
+
+    let output = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+#[tauri::command]
+async fn enable_proxy(app_handle: tauri::AppHandle) -> Result<String, String> {
+    // Invoke vpn-helper --enable-proxy with admin privs
+    run_vpn_helper_auth("--enable-proxy", app_handle)
+}
+
+#[tauri::command]
+async fn disable_proxy(app_handle: tauri::AppHandle) -> Result<String, String> {
+    run_vpn_helper_auth("--disable-proxy", app_handle)
+}
+
 fn main() {
     let app_state = ManagedState(Arc::new(Mutex::new(AppState {
         is_logged_in: false,
@@ -383,10 +441,27 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![])))
         .manage(app_state)
         .setup(|app| {
-            let handle = app.handle();
+            let handle = app.handle().clone();
             
+            // Enable AutoSart (OS Login Item)
+            let _ = app.autolaunch().enable();
+            
+            // Auto-start Proxy on App Launch (User Request)
+            // This will prompt for password if not already authorized recently
+            tauri::async_runtime::spawn(async move {
+                // Delay slightly to let UI show up first
+                time::sleep(Duration::from_secs(2)).await;
+                println!("🚀 Auto-enabling HTTP Proxy...");
+                match enable_proxy(handle.clone()).await {
+                    Ok(out) => println!("✅ Proxy Auto-Enabled: {}", out),
+                    Err(e) => eprintln!("❌ Failed to Auto-Enable Proxy: {}", e),
+                }
+            });
+
+            let handle = app.handle();
             // 1. 创建托盘图标及其菜单（Tauri 2 风格）
             let show_i = MenuItem::with_id(handle, "show", "显示主界面", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(handle, "quit", "退出客户端 (需验证)", true, None::<&str>)?;
@@ -448,7 +523,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             register, login, set_device_info, set_audit_policy,
             get_pop_nodes, switch_pop_node, check_for_updates,
-            start_vpn, stop_vpn, get_vpn_status
+            start_vpn, stop_vpn, get_vpn_status,
+            enable_proxy, disable_proxy
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

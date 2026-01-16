@@ -1,6 +1,6 @@
 {
     "$schema": "https://schema.tauri.app/config/2",
-    "productName": "mac-monitor-gui",
+    "productName": "Mac Monitor",
     "version": "0.1.0",
     "identifier": "com.mac-monitor-gui.app",
     "build": {
@@ -23,14 +23,23 @@
     },
     "bundle": {
         "active": true,
-        "targets": "all",
+        "targets": [
+            "dmg",
+            "app"
+        ],
+        "macOS": {
+            "frameworks": [],
+            "minimumSystemVersion": "10.13"
+        },
         "icon": [
             "icons/icon.png"
         ],
         "externalBin": [
-            "bin/AuditService",
             "bin/vpn-helper",
             "bin/traffic-proxy"
+        ],
+        "resources": [
+            "bin/AuditService.app"
         ]
     }
 }

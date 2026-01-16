@@ -270,7 +270,7 @@ async fn get_service_context() -> Arc<ServiceContext> {
 }
 
 #[no_mangle]
-pub extern "C" fn init_audit_core() {
+pub fn init_audit_core() {
     RUNTIME.spawn(async {
         let _ = get_service_context().await;
         log::info!("Audit Logic Core initialized successfully");

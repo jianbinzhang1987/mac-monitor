@@ -1,0 +1,25 @@
+{
+    "title": "Mac Monitor",
+    "icon": "gui-app/src-tauri/icons/icon.icns",
+    "background-color": "#ffffff",
+    "contents": [
+        {
+            "x": 240,
+            "y": 280,
+            "type": "file",
+            "path": "gui-app/src-tauri/target/release/bundle/macos/Mac Monitor.app"
+        },
+        {
+            "x": 560,
+            "y": 280,
+            "type": "link",
+            "path": "/Applications"
+        }
+    ],
+    "window": {
+        "size": {
+            "width": 800,
+            "height": 600
+        }
+    }
+}
