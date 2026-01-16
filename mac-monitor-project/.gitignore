@@ -5,6 +5,5 @@ target/
 *.pid
 *.pem
 *.key
-vpn-helper
-traffic-proxy
 gui-app/src-tauri/bin/
+vpn-helper-x86_64-apple-darwin
