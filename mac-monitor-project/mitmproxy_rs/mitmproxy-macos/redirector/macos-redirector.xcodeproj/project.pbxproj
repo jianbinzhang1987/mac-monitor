@@ -15,7 +15,7 @@
 		CE7A86C02A8CFBAD009E0B82 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE7A86BF2A8CFBAD009E0B82 /* NetworkExtension.framework */; };
 		CE7A86C32A8CFBAD009E0B82 /* TransparentProxyProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7A86C22A8CFBAD009E0B82 /* TransparentProxyProvider.swift */; };
 		CE7A86C52A8CFBAD009E0B82 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7A86C42A8CFBAD009E0B82 /* main.swift */; };
-		CE7A86CA2A8CFBAD009E0B82 /* org.mitmproxy.macos-redirector.network-extension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = CE7A86BD2A8CFBAD009E0B82 /* org.mitmproxy.macos-redirector.network-extension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CE7A86CA2A8CFBAD009E0B82 /* com.mac-monitor-gui.app.network-extension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = CE7A86BD2A8CFBAD009E0B82 /* com.mac-monitor-gui.app.network-extension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CE870C102AAD2B4C00510CD1 /* libbsm.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = CE870C0B2AAD29B000510CD1 /* libbsm.tbd */; };
 		CE904BCE2A8E9B2600A7DF8A /* app.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC7D6762A8E2B2300E1A6E9 /* app.swift */; };
 		CE904BD22A8E9B6A00A7DF8A /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = CE904BD12A8E9B6A00A7DF8A /* SwiftProtobuf */; };
@@ -40,7 +40,7 @@
 			dstPath = "$(SYSTEM_EXTENSIONS_FOLDER_PATH)";
 			dstSubfolderSpec = 16;
 			files = (
-				CE7A86CA2A8CFBAD009E0B82 /* org.mitmproxy.macos-redirector.network-extension.systemextension in Embed System Extensions */,
+				CE7A86CA2A8CFBAD009E0B82 /* com.mac-monitor-gui.app.network-extension.systemextension in Embed System Extensions */,
 			);
 			name = "Embed System Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -55,7 +55,7 @@
 		CE7A86A72A8CFB86009E0B82 /* Mitmproxy Redirector.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Mitmproxy Redirector.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE7A86AE2A8CFB87009E0B82 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CE7A86B32A8CFB87009E0B82 /* macos_redirector.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = macos_redirector.entitlements; sourceTree = "<group>"; };
-		CE7A86BD2A8CFBAD009E0B82 /* org.mitmproxy.macos-redirector.network-extension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = "org.mitmproxy.macos-redirector.network-extension.systemextension"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CE7A86BD2A8CFBAD009E0B82 /* com.mac-monitor-gui.app.network-extension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = "com.mac-monitor-gui.app.network-extension.systemextension"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE7A86BF2A8CFBAD009E0B82 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 		CE7A86C22A8CFBAD009E0B82 /* TransparentProxyProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparentProxyProvider.swift; sourceTree = "<group>"; };
 		CE7A86C42A8CFBAD009E0B82 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -108,7 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				CE7A86A72A8CFB86009E0B82 /* Mitmproxy Redirector.app */,
-				CE7A86BD2A8CFBAD009E0B82 /* org.mitmproxy.macos-redirector.network-extension.systemextension */,
+				CE7A86BD2A8CFBAD009E0B82 /* com.mac-monitor-gui.app.network-extension.systemextension */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -200,8 +200,8 @@
 				CE904BD32A8E9BD500A7DF8A /* SwiftProtobuf */,
 			);
 			productName = "network-extension";
-			productReference = CE7A86BD2A8CFBAD009E0B82 /* org.mitmproxy.macos-redirector.network-extension.systemextension */;
-			productType = "com.apple.product-type.system-extension";
+			productReference = CE7A86BD2A8CFBAD009E0B82 /* com.mac-monitor-gui.app.network-extension.systemextension */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -418,7 +418,6 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
-				CODE_SIGN_ENTITLEMENTS = "macos-redirector/macos_redirector.entitlements";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -438,7 +437,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.mitmproxy.macos-redirector";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mac-monitor-gui.app";
 				PRODUCT_NAME = "Mitmproxy Redirector";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Mitmproxy Redirector";
@@ -453,7 +452,6 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
-				CODE_SIGN_ENTITLEMENTS = "macos-redirector/macos_redirector.entitlements";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -473,7 +471,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.mitmproxy.macos-redirector";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mac-monitor-gui.app";
 				PRODUCT_NAME = "Mitmproxy Redirector";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Mitmproxy Redirector";
@@ -485,7 +483,6 @@
 		CE7A86CC2A8CFBAD009E0B82 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "network-extension/network_extension.entitlements";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
@@ -503,8 +500,25 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MARKETING_VERSION = 2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.mitmproxy.macos-redirector.network-extension";
-				PRODUCT_NAME = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mac-monitor-gui.app.network-extension";
+				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;				PRODUCT_MODULE_NAME = network_extension;				PRODUCT_MODULE_NAME = network_extension;				PRODUCT_NAME = "$(inherited)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Mitmproxy Redirector Network Extension";
 				SKIP_INSTALL = YES;
@@ -517,7 +531,6 @@
 		CE7A86CD2A8CFBAD009E0B82 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "network-extension/network_extension.entitlements";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
@@ -535,8 +548,25 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MARKETING_VERSION = 2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.mitmproxy.macos-redirector.network-extension";
-				PRODUCT_NAME = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mac-monitor-gui.app.network-extension";
+				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;				PRODUCT_MODULE_NAME = network_extension;				PRODUCT_MODULE_NAME = network_extension;				PRODUCT_NAME = "$(inherited)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Mitmproxy Redirector Network Extension";
 				SKIP_INSTALL = YES;

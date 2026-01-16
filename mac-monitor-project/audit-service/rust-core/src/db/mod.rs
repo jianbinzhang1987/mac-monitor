@@ -20,9 +20,9 @@ impl Database {
     }
 
     async fn init(&self) -> Result<(), sqlx::Error> {
-        // 创建审计日志表 (流量日志)
+        // 创建流量审计表 (与服务端对齐)
         sqlx::query(
-            "CREATE TABLE IF NOT EXISTS audit_logs (
+            "CREATE TABLE IF NOT EXISTS monitor_log_traffic (
                 id TEXT PRIMARY KEY,
                 cpe_id TEXT,
                 url TEXT,
@@ -107,7 +107,7 @@ impl Database {
 
     pub async fn save_audit_log(&self, log: &AuditLog) -> Result<(), sqlx::Error> {
         sqlx::query(
-            "INSERT INTO audit_logs (id, cpe_id, url, req_time, method_type, domain, process_name, risk_level, ip, mac, host_id)
+            "INSERT INTO monitor_log_traffic (id, cpe_id, url, req_time, method_type, domain, process_name, risk_level, ip, mac, host_id)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&log.id)
@@ -179,7 +179,7 @@ impl Database {
                 ip,
                 mac,
                 host_id
-            FROM audit_logs WHERE is_uploaded = 0 LIMIT 10"#
+            FROM monitor_log_traffic WHERE is_uploaded = 0 LIMIT 10"#
         )
         .fetch_all(&self.pool)
         .await?;
@@ -204,7 +204,7 @@ impl Database {
     }
 
     pub async fn mark_audit_log_sent(&self, id: &str) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE audit_logs SET is_uploaded = 1 WHERE id = ?")
+        sqlx::query("UPDATE monitor_log_traffic SET is_uploaded = 1 WHERE id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;

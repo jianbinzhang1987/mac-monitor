@@ -26,6 +26,11 @@
         "targets": "all",
         "icon": [
             "icons/icon.png"
+        ],
+        "externalBin": [
+            "bin/AuditService",
+            "bin/vpn-helper",
+            "bin/traffic-proxy"
         ]
     }
 }

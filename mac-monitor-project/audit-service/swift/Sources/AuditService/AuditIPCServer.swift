@@ -187,10 +187,43 @@ class AuditIPCServer {
     }
     
     private func uploadToServer(endpoint: String, payload: Any) {
-        // TODO: 结合 AppState 获取 Server URL 和 Token
-        // 这里简化为直接通过 URLSession 批量/即时上报
-        print("🚀 [Audit Upload] Sending data to \(endpoint)...")
+        // 配置测试服务器地址（实际应从配置获取）
+        let serverBase = "http://127.0.0.1:8080"
+        guard let url = URL(string: "\(serverBase)\(endpoint)") else {
+            print("❌ Invalid server URL")
+            return
+        }
         
-        // 实际上此处应调动 Rust Core 的异步上报逻辑或 Swift 侧的重试队列
+        print("🚀 [Audit Upload] Sending data to \(url)...")
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // 如果有 Token，在此处添加 Header
+        // request.setValue("Bearer YOUR_TOKEN", forHTTPHeaderField: "Authorization")
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: payload, options: [])
+            request.httpBody = jsonData
+            
+            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("❌ Upload failed: \(error.localizedDescription)")
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse {
+                    if (200...299).contains(httpResponse.statusCode) {
+                        print("✅ Upload successful: HTTP \(httpResponse.statusCode)")
+                    } else {
+                        print("⚠️ Upload server error: HTTP \(httpResponse.statusCode)")
+                    }
+                }
+            }
+            task.resume()
+        } catch {
+            print("❌ JSON serialization failed: \(error)")
+        }
     }
 }

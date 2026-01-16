@@ -2,14 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDisplayName</key>
+	<string>Mac Monitor Extension</string>
+	<key>CFBundleName</key>
+	<string>Mac Monitor Extension</string>
 	<key>NSSystemExtensionUsageDescription</key>
-	<string>Redirect traffic to mitmproxy</string>
+	<string>Monitor network traffic</string>
 	<key>NetworkExtension</key>
 	<dict>
 		<key>NEProviderClasses</key>
 		<dict>
-			<key>com.apple.networkextension.app-proxy</key>
-			<string>$(PRODUCT_MODULE_NAME).TransparentProxyProvider</string>
+			<key>com.apple.networkextension.packet-tunnel-provider</key>
+			<string>network_extension.PacketTunnelProvider</string>
 		</dict>
 	</dict>
 </dict>

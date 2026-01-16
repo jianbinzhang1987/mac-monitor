@@ -8,6 +8,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, State,
 };
+use tauri_plugin_shell::ShellExt;
 use tokio::time::{self, Duration};
 use interprocess::local_socket::LocalSocketStream;
 use std::io::{Read, Write};
@@ -261,6 +262,49 @@ async fn set_audit_policy(
     Ok("审计策略已保存".to_string())
 }
 
+#[tauri::command]
+async fn start_vpn(app_handle: tauri::AppHandle) -> Result<String, String> {
+    println!("🔌 Starting VPN via sidecar...");
+    let sidecar = app_handle.shell().sidecar("vpn-helper")
+        .map_err(|e| format!("找不到 vpn-helper: {}", e))?;
+    
+    let (_rx, _child) = sidecar.arg("--start").spawn()
+        .map_err(|e| format!("启动 vpn-helper 失败: {}", e))?;
+    
+    Ok("VPN 启动指令已发送".to_string())
+}
+
+#[tauri::command]
+async fn stop_vpn(app_handle: tauri::AppHandle) -> Result<String, String> {
+    println!("🛑 Stopping VPN via sidecar...");
+    let sidecar = app_handle.shell().sidecar("vpn-helper")
+        .map_err(|e| format!("找不到 vpn-helper: {}", e))?;
+    
+    let (_rx, _child) = sidecar.arg("--stop").spawn()
+        .map_err(|e| format!("停止 vpn-helper 失败: {}", e))?;
+    
+    Ok("VPN 停止指令已发送".to_string())
+}
+
+#[tauri::command]
+async fn get_vpn_status(app_handle: tauri::AppHandle) -> Result<i32, String> {
+    let sidecar = app_handle.shell().sidecar("vpn-helper")
+        .map_err(|e| format!("找不到 vpn-helper: {}", e))?;
+    
+    let output = sidecar.arg("--status").output().await
+        .map_err(|e| format!("获取 VPN 状态失败: {}", e))?;
+    
+    if output.status.success() {
+        let out_str = String::from_utf8_lossy(&output.stdout);
+        if let Some(line) = out_str.lines().find(|l| l.contains("VPN Status:")) {
+            if let Some(status_str) = line.split(":").last() {
+                return status_str.trim().parse::<i32>().map_err(|e| e.to_string());
+            }
+        }
+    }
+    Err("无法解析 VPN 状态".to_string())
+}
+
 fn start_heartbeat_loop(app_handle: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut interval = time::interval(Duration::from_secs(30));
@@ -381,12 +425,30 @@ fn main() {
                 })
                 .build(app)?;
 
+            // 启动 AuditService Sidecar
+            match app.shell().sidecar("AuditService") {
+                Ok(command) => {
+                    match command.spawn() {
+                        Ok((mut _rx, _child)) => {
+                            println!("🚀 AuditService Sidecar started successfully");
+                        }
+                        Err(e) => {
+                            eprintln!("❌ Failed to spawn AuditService sidecar: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to find AuditService sidecar: {}", e);
+                }
+            }
+
             start_heartbeat_loop(handle.clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             register, login, set_device_info, set_audit_policy,
-            get_pop_nodes, switch_pop_node, check_for_updates
+            get_pop_nodes, switch_pop_node, check_for_updates,
+            start_vpn, stop_vpn, get_vpn_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

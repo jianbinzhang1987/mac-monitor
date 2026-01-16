@@ -1,0 +1,10 @@
+target/
+**/target/
+*.DS_Store
+*.log
+*.pid
+*.pem
+*.key
+vpn-helper
+traffic-proxy
+gui-app/src-tauri/bin/

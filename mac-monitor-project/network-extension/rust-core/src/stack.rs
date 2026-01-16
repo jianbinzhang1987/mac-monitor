@@ -1,14 +1,11 @@
+use crate::device::TunDevice;
 use crate::dns::DnsServer;
 use crate::mitm::MitmProxy;
-use rustls::server::ClientHello;
 use smoltcp::iface::{Config, Interface, SocketSet};
-use smoltcp::socket::{tcp, udp};
+use smoltcp::socket::tcp;
 use smoltcp::time::Instant;
-use smoltcp::wire::{IpAddress, IpCidr, Ipv4Address};
-use std::collections::HashMap;
+use smoltcp::wire::IpAddress;
 use std::sync::{Arc, Mutex};
-use crate::device::TunDevice;
-use tls_parser::{parse_tls_extensions, TlsExtension, TlsMessage, TlsMessageHandshake};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -18,38 +15,72 @@ pub struct NetworkStack {
     pub sockets: SocketSet<'static>,
     pub mitm_proxy: Arc<Mutex<MitmProxy>>,
     pub dns_server: DnsServer,
+    pub active_connections: std::collections::HashSet<smoltcp::iface::SocketHandle>,
 }
 
 impl NetworkStack {
     pub fn new() -> Result<StackHandle> {
         let mut device = TunDevice::new(1500);
         let mut sockets = SocketSet::new(vec![]);
-        
+
         let config = Config::new(smoltcp::wire::HardwareAddress::Ip);
         let interface = Interface::new(config, &mut device, Instant::now());
-        
+
         let dns_server = DnsServer::new(&mut sockets);
         let mitm_proxy = Arc::new(Mutex::new(MitmProxy::new()));
-        
+
         let stack = Arc::new(Mutex::new(NetworkStack {
             device: device.clone(),
             interface,
             sockets,
             mitm_proxy,
             dns_server,
+            active_connections: std::collections::HashSet::new(),
         }));
-        
-        Ok(StackHandle {
-            device,
-            stack,
-        })
+
+        Ok(StackHandle { device, stack })
     }
 
     pub fn poll(&mut self) {
         let timestamp = Instant::now();
-        self.interface.poll(timestamp, &mut self.device, &mut self.sockets);
+        self.interface
+            .poll(timestamp, &mut self.device, &mut self.sockets);
         self.dns_server.handle_queries(&mut self.sockets);
-        // TODO: Handle TCP/HTTPS redirection to MITM
+
+        // TCP 拦截与重定向逻辑
+        self.handle_tcp_intercept();
+    }
+
+    fn handle_tcp_intercept(&mut self) {
+        // 查找所有处于 SYN-RECEIVED 状态的连接并接受它们
+        // 这里简化实现：检测到的任何 443 端口连接都会通过 MITM 处理
+        
+        // 我们需要通过 handle 列表来避免在迭代时借用错误
+        let handles: Vec<_> = self.sockets.iter().map(|(handle, _)| handle).collect();
+
+        for handle in handles {
+            let socket = self.sockets.get_mut::<tcp::Socket>(handle);
+            if socket.is_active() && socket.may_recv() {
+                let mut data = vec![0u8; 4096];
+                if let Ok(len) = socket.recv_slice(&mut data) {
+                    if len > 0 {
+                        let remote_endpoint = socket.remote_endpoint().unwrap();
+                        let domain = self.dns_server
+                            .get_domain_by_ip(&remote_endpoint.addr)
+                            .map(|n| n.to_string())
+                            .unwrap_or_else(|| remote_endpoint.addr.to_string());
+                        
+                        log::info!("Intercepted traffic for {}: {}", domain, len);
+                        
+                        let mut proxy = self.mitm_proxy.lock().unwrap();
+                        // 调用 MITM 逻辑进行审计上报
+                        if let Ok(_) = proxy.handle_https_connection(&domain, &data[..len]) {
+                            // 审计逻辑处理完成后，数据透传（此处为简化版实现）
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -84,4 +115,3 @@ impl StackHandle {
         }
     }
 }
-// ... (rest of the file is unchanged for now)

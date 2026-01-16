@@ -218,19 +218,51 @@ pub fn set_audit_policy_json(json: &str) -> Result<()> {
 
 fn should_log_request(domain: &str, url: &str) -> bool {
     let policy = GLOBAL_AUDIT_POLICY.lock().unwrap();
-    if policy.white_domains.is_empty() {
-        return true;
-    }
     let domain_lower = domain.to_ascii_lowercase();
-    for entry in &policy.white_domains {
-        let item = entry.domain.trim().to_ascii_lowercase();
-        if item.is_empty() {
-            continue;
+
+    // 优先检查目标域名列表（如果配置了，则只记录匹配的域名）
+    if !policy.target_domains.is_empty() {
+        let mut matched = false;
+        for entry in &policy.target_domains {
+            if !entry.enabled {
+                continue;
+            }
+            let target = entry.domain.trim().to_ascii_lowercase();
+            if target.is_empty() {
+                continue;
+            }
+
+            // 支持通配符匹配: *.google.com 匹配 www.google.com, mail.google.com 等
+            if target.starts_with("*.") {
+                let suffix = &target[2..]; // 去掉 "*."
+                if domain_lower == suffix || domain_lower.ends_with(&format!(".{}", suffix)) {
+                    matched = true;
+                    break;
+                }
+            } else if domain_lower == target || domain_lower.ends_with(&format!(".{}", target)) {
+                matched = true;
+                break;
+            }
         }
-        if domain_lower == item || domain_lower.ends_with(&format!(".{}", item)) {
-            return false;
+
+        if !matched {
+            return false; // 不在目标域名列表中，不记录
         }
     }
+
+    // 检查白名单（白名单中的域名不记录）
+    if !policy.white_domains.is_empty() {
+        for entry in &policy.white_domains {
+            let item = entry.domain.trim().to_ascii_lowercase();
+            if item.is_empty() {
+                continue;
+            }
+            if domain_lower == item || domain_lower.ends_with(&format!(".{}", item)) {
+                return false;
+            }
+        }
+    }
+
     let _ = url;
     true
 }
@@ -301,6 +333,8 @@ struct AuditPolicy {
     #[serde(default)]
     white_domains: Vec<WhiteDomain>,
     #[serde(default)]
+    target_domains: Vec<TargetDomain>,
+    #[serde(default)]
     website_rsp_config_array: Vec<ResponseConfig>,
 }
 
@@ -309,6 +343,13 @@ struct WhiteDomain {
     domain: String,
     #[serde(default)]
     id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct TargetDomain {
+    domain: String,
+    #[serde(default)]
+    enabled: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

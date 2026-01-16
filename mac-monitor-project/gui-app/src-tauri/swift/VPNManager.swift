@@ -10,33 +10,56 @@ import Foundation
 
     override init() {
         super.init()
-        loadManager()
     }
 
-    func loadManager() {
+    func loadManager(completion: @escaping (NETunnelProviderManager?) -> Void) {
+        print("[Debug] Loading all managers...")
         NETunnelProviderManager.loadAllFromPreferences { [weak self] (managers, error) in
             if let error = error {
-                print("Failed to load VPN managers: \(error)")
+                print("[Debug] Error loading managers: \(error)")
+                completion(nil)
                 return
             }
-            self?.manager = managers?.first ?? NETunnelProviderManager()
-            self?.setupProtocol()
+            let manager = managers?.first ?? NETunnelProviderManager()
+            self?.manager = manager
+            print("[Debug] Manager loaded. Enabled: \(manager.isEnabled)")
+            completion(manager)
         }
     }
 
-    private func setupProtocol() {
-        guard let manager = manager else { return }
+    @objc func startVPN() {
+        loadManager { [weak self] manager in
+            guard let self = self, let manager = manager else { return }
+            
+            // Explicitly reload to avoid stale config
+            print("[Debug] Reloading manager preferences...")
+            manager.loadFromPreferences { error in
+                if let error = error {
+                    print("[Debug] Load error: \(error)")
+                    // Continue anyway, maybe it's a new manager
+                }
+                
+                self.configureAndSave(manager: manager)
+            }
+        }
+    }
 
-        let protocolConfiguration = NETunnelProviderProtocol()
-        protocolConfiguration.providerBundleIdentifier = "com.example.mac-monitor.network-extension"
+    private func configureAndSave(manager: NETunnelProviderManager) {
+        let protocolConfiguration = (manager.protocolConfiguration as? NETunnelProviderProtocol) ?? NETunnelProviderProtocol()
+        
+        protocolConfiguration.providerBundleIdentifier = "com.mac-monitor-gui.app.network-extension"
         protocolConfiguration.serverAddress = "MacMonitorAuditSystem"
-        var providerConfig = [String: String]()
+        
+        var providerConfig = [String: NSObject]()
         if let info = loadDeviceInfo() {
-            providerConfig.merge(deviceInfoDictionary(from: info)) { _, new in new }
+            for (key, value) in deviceInfoDictionary(from: info) {
+                providerConfig[key] = value as NSString
+            }
         }
         if let policy = loadAuditPolicy() {
-            providerConfig["audit_policy_json"] = policy
+            providerConfig["audit_policy_json"] = policy as NSString
         }
+        
         if !providerConfig.isEmpty {
             protocolConfiguration.providerConfiguration = providerConfig
         }
@@ -45,62 +68,55 @@ import Foundation
         manager.localizedDescription = "Mac Monitor VPN"
         manager.isEnabled = true
 
+        print("[Debug] Saving preferences...")
         manager.saveToPreferences { error in
             if let error = error {
-                print("Failed to save VPN preferences: \(error)")
+                print("[Debug] Failed to save VPN preferences: \(error)")
+                // If stale, we might want to retry? For now just log.
             } else {
-                print("VPN preferences saved successfully")
+                print("[Debug] VPN preferences saved successfully")
+            }
+            
+            // Reload again before starting
+            manager.loadFromPreferences { error in
+                if let error = error {
+                     print("[Debug] Post-save reload error: \(error)")
+                }
+                self.performStart(manager: manager)
             }
         }
     }
-
-    @objc func startVPN() {
-        loadManager() // Ensure we have the latest manager
-        guard let manager = manager else { return }
-
-        if let protocolConfig = manager.protocolConfiguration as? NETunnelProviderProtocol {
-            var providerConfig = [String: String]()
-            if let info = loadDeviceInfo() {
-                providerConfig.merge(deviceInfoDictionary(from: info)) { _, new in new }
-            }
-            if let policy = loadAuditPolicy() {
-                providerConfig["audit_policy_json"] = policy
-            }
-            if !providerConfig.isEmpty {
-                protocolConfig.providerConfiguration = providerConfig
-                manager.protocolConfiguration = protocolConfig
+    
+    private func performStart(manager: NETunnelProviderManager) {
+        print("[Debug] Attempting to start VPN tunnel...")
+        var options = [String: NSObject]()
+        if let info = self.loadDeviceInfo() {
+            for (key, value) in self.deviceInfoDictionary(from: info) {
+                options[key] = value as NSString
             }
         }
-
-        manager.saveToPreferences { error in
-            if let error = error {
-                print("Failed to save VPN preferences: \(error)")
-                return
-            }
-
-            var options = [String: String]()
-            if let info = self.loadDeviceInfo() {
-                options.merge(self.deviceInfoDictionary(from: info)) { _, new in new }
-            }
-            if let policy = self.loadAuditPolicy() {
-                options["audit_policy_json"] = policy
-            }
-            do {
-                try manager.connection.startVPNTunnel(options: options)
-                print("VPN starting...")
-            } catch {
-                print("Failed to start VPN: \(error)")
-            }
+        if let policy = self.loadAuditPolicy() {
+            options["audit_policy_json"] = policy as NSString
+        }
+        do {
+            try manager.connection.startVPNTunnel(options: options)
+            print("[Debug] startVPNTunnel called successfully.")
+        } catch {
+            print("[Debug] Failed to start VPN: \(error)")
         }
     }
 
     @objc func stopVPN() {
-        manager?.connection.stopVPNTunnel()
-        print("VPN stopping...")
+        loadManager { manager in
+            manager?.connection.stopVPNTunnel()
+            print("VPN stopping...")
+        }
     }
-
-    @objc func getStatus() -> Int {
-        return manager?.connection.status.rawValue ?? 0
+    
+    @objc func printStatus() {
+         loadManager { manager in
+             print("VPN Status: \(manager?.connection.status.rawValue ?? 0)")
+         }
     }
 
     private func loadDeviceInfo() -> DeviceInfo? {

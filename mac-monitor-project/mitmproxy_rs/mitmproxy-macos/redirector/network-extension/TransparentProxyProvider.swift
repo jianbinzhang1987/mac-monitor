@@ -1,186 +1,175 @@
-import Darwin
-import Foundation
-import Network
 import NetworkExtension
+import Foundation
 
-enum TransparentProxyError: Error {
-    case serverAddressMissing
-    case noRemoteEndpoint
-    case noLocalEndpoint
-    case unexpectedFlow
-}
+class PacketTunnelProvider: NEPacketTunnelProvider {
 
-class TransparentProxyProvider: NETransparentProxyProvider {
-    var unixSocket: String?
-    var controlChannel: NWConnection?
-    var spec: InterceptConf?
+    // 专用队列用于处理出站数据包，避免阻塞主线程
+    private let outputQueue = DispatchQueue(label: "com.macmonitor.packetTunnel.output")
+    private var isRunning = false
 
-    override func startProxy(options: [String: Any]? = nil) async throws {
-        log.debug("Starting proxy...")
-
-        guard let unixSocket = self.protocolConfiguration.serverAddress
-        else { throw TransparentProxyError.serverAddressMissing }
-        self.unixSocket = unixSocket
-        log.debug("Establishing control channel via \(unixSocket, privacy: .public)...")
-        let control = NWConnection(
-            to: .unix(path: unixSocket),
-            using: .tcp
-        )
-        controlChannel = control
-        try await control.establish()
-        control.stateUpdateHandler = { state in
-            switch state {
-            case .failed(.posix(.ENETDOWN)):
-                log.debug("control channel closed, stopping proxy.")
-                control.forceCancel()
-                self.cancelProxyWithError(.none)
-            case .failed(let err):
-                log.error("control channel failed: \(err, privacy: .public)")
-                control.forceCancel()
-                self.cancelProxyWithError(err)
-            default:
-                break
-            }
+    override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
+        // 1. 初始化 Rust 协议栈
+        let initResult = init_stack()
+        if initResult != 0 {
+            completionHandler(NSError(domain: "PacketTunnel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Rust stack"]))
+            return
         }
-        Task {
-            do {
-                while let spec = try await control.receive(ipc: MitmproxyIpc_InterceptConf.self) {
-                    log.debug("Received spec: \(String(describing: spec), privacy: .public)")
-                    self.spec = try InterceptConf(from: spec)
+
+        // 1.1 同步设备信息到 Rust（用于审计日志字段填充）
+        let pin = stringConfigValue(key: "pin_number", options: options) ?? ""
+        let ip = stringConfigValue(key: "ip", options: options) ?? ""
+        let mac = stringConfigValue(key: "mac", options: options) ?? ""
+        let cpeId = stringConfigValue(key: "cpe_id", options: options) ?? ""
+        let hostId = stringConfigValue(key: "host_id", options: options) ?? ""
+        let policyJson = stringConfigValue(key: "audit_policy_json", options: options) ?? ""
+        pin.withCString { pinPtr in
+            ip.withCString { ipPtr in
+                mac.withCString { macPtr in
+                    cpeId.withCString { cpePtr in
+                        hostId.withCString { hostPtr in
+                            set_device_info(pinPtr, ipPtr, macPtr, cpePtr, hostPtr)
+                        }
+                    }
                 }
-            } catch {
-                log.error("Error on control channel: \(String(describing: error), privacy: .public)")
-                control.forceCancel()
-                self.cancelProxyWithError(error)
             }
         }
-        log.debug("Established. Applying tunnel settings...")
+        if !policyJson.isEmpty {
+            policyJson.withCString { policyPtr in
+                _ = set_audit_policy(policyPtr)
+            }
+        }
 
-        let proxySettings = NETransparentProxyNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
-        proxySettings.includedNetworkRules = [
-            NENetworkRule(
-                remoteNetwork: nil,
-                remotePrefix: 0,
-                localNetwork: nil,
-                localPrefix: 0,
-                protocol: .any,
-                // https://developer.apple.com/documentation/networkextension/netransparentproxynetworksettings/3143656-includednetworkrules:
-                // The matchDirection property must be NETrafficDirection.outbound.
-                direction: .outbound
-            )
-        ]
+        let networkSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
 
-        try await setTunnelNetworkSettings(proxySettings)
-        log.debug("Applied. Proxy start complete.")
+        // Configure IPv4 settings
+        // 使用 10.0.0.2 作为虚拟 IP，10.0.0.1 作为网关（在 Rust 侧配置）
+        let ipv4Settings = NEIPv4Settings(addresses: ["10.0.0.2"], subnetMasks: ["255.255.255.0"])
+        ipv4Settings.includedRoutes = [NEIPv4Route.default()]
+        networkSettings.ipv4Settings = ipv4Settings
+
+        // Configure DNS settings (Requirement: Clear DNS cache on login/logout)
+        let dnsSettings = NEDNSSettings(servers: ["8.8.8.8", "1.1.1.1"])
+        dnsSettings.matchDomains = [""] // Intercept all DNS
+        networkSettings.dnsSettings = dnsSettings
+
+        setTunnelNetworkSettings(networkSettings) { error in
+            if let error = error {
+                completionHandler(error)
+                return
+            }
+
+            self.isRunning = true
+
+            // 2. 开始读取入站数据包 (System -> Rust)
+            self.readPackets()
+
+            // 3. 开始轮询出站数据包 (Rust -> System)
+            self.startOutputLoop()
+
+            completionHandler(nil)
+        }
     }
 
-    override func stopProxy(with reason: NEProviderStopReason) async {
-        log.debug("stopProxy \(String(describing: reason), privacy: .public)")
-        self.controlChannel?.forceCancel()
+    override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
+        self.isRunning = false
+        shutdown_stack()
+        completionHandler()
     }
 
-    override func handleNewFlow(_ flow: NEAppProxyFlow) -> Bool {
-        // Called for every new flow that is started.
-        // We first want to figure out if we want to intercept this one.
-        // Our intercept specs are based on process name and pid, so we first need to convert from
-        // audit token to that.
-        
-        let processInfo = ProcessInfoCache.getInfo(fromAuditToken: flow.metaData.sourceAppAuditToken)
-        guard let processInfo = processInfo else {
-            log.debug("Skipping flow without process info.")
-            return false
-        }
-        log.debug("Handling new flow: \(String(describing: processInfo), privacy: .public)")
+    private func readPackets() {
+        // 递归读取系统发送的数据包
+        packetFlow.readPackets { [weak self] (packets, protocols) in
+            guard let self = self, self.isRunning else { return }
 
-        guard let spec = self.spec else {
-            log.debug("Skipping flow, no intercept spec provided.")
-            return false
-        }
-        guard spec.shouldIntercept(processInfo) else {
-            log.debug("Flow not in scope, leaving it to the system.")
-            return false
-        }
-        
-        let message: MitmproxyIpc_NewFlow
-        do {
-            message = try self.makeIpcHandshake(flow: flow, processInfo: processInfo)
-        } catch {
-            log.error("Failed to create IPC handshake: \(error, privacy: .public), flow=\(flow, privacy: .public)")
-            return false
-        }
-        Task {
-            do {
-                log.debug("Intercepting...")
-                try await flow.open(withLocalEndpoint: nil)
-                
-                let conn = NWConnection(
-                    to: .unix(path: self.unixSocket!),
-                    using: .tcp
-                )
-                do {
-                    try await conn.establish()
-                } catch {
-                    flow.closeReadWithError(error)
-                    flow.closeWriteWithError(error)
-                    throw error
+            for packet in packets {
+                // Call Rust FFI to process packet
+                packet.withUnsafeBytes { ptr in
+                    if let baseAddress = ptr.baseAddress {
+                        let _ = process_packet(baseAddress.assumingMemoryBound(to: UInt8.self), ptr.count)
+                    }
                 }
-                
-                try await conn.send(ipc: message)
-                log.debug("Handshake sent.")
-                
-                if let tcp_flow = flow as? NEAppProxyTCPFlow {
-                    tcp_flow.outboundCopier(conn)
-                    tcp_flow.inboundCopier(conn)
-                } else if let udp_flow = flow as? NEAppProxyUDPFlow {
-                    udp_flow.outboundCopier(conn)
-                    udp_flow.inboundCopier(conn)
-                }
-            } catch {
-                log.error("Error handling flow: \(String(describing: error), privacy: .public)")
-                flow.closeReadWithError(error)
-                flow.closeWriteWithError(error)
             }
+
+            // 驱动协议栈的一轮处理
+            poll_stack()
+
+            // Continue reading
+            self.readPackets()
         }
-        return true
     }
-    
-    func makeIpcHandshake(flow: NEAppProxyFlow, processInfo: ProcessInfo) throws -> MitmproxyIpc_NewFlow {
-        let tunnelInfo = MitmproxyIpc_TunnelInfo.with {
-            $0.pid = processInfo.pid
-            if let path = processInfo.path {
-                $0.processName = path
-            }
-        }
-        
-        // Do not use remoteHostname property; for DNS UDP flows that's already pointing at the name that we want to look up.
-        // log.debug("remoteHostname: \(String(describing: flow.remoteHostname), privacy: .public) flow:\(String(describing: flow), privacy: .public)")
-    
-        let message: MitmproxyIpc_NewFlow
-        if let tcp_flow = flow as? NEAppProxyTCPFlow {
-            guard let remoteEndpoint = tcp_flow.remoteEndpoint as? NWHostEndpoint else {
-                throw TransparentProxyError.noRemoteEndpoint
-            }
-            // log.debug("remoteEndpoint: \(String(describing: remoteEndpoint), privacy: .public)")
-            // It would be nice if we could also include info on the local endpoint here, but that's not exposed.
-            message = MitmproxyIpc_NewFlow.with {
-                $0.tcp = MitmproxyIpc_TcpFlow.with {
-                    $0.remoteAddress = MitmproxyIpc_Address.init(endpoint: remoteEndpoint)
-                    $0.tunnelInfo = tunnelInfo
+
+    private func startOutputLoop() {
+        outputQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // 预分配缓冲区
+            let bufferSize = 65536
+            var buffer = [UInt8](repeating: 0, count: bufferSize)
+
+            while self.isRunning {
+                var writtenLen: Int = 0
+
+                // 尝试从 Rust 协议栈读取数据
+                let result = get_outbound_packet(&buffer, bufferSize, &writtenLen)
+
+                if result == 0 && writtenLen > 0 {
+                    let data = Data(bytes: buffer, count: writtenLen)
+                    // IPv4 protocol number is 2 (NSNumber) for writePackets
+                    // 但 writePackets 只接受 [Data] 和 [NSNumber]
+                    self.packetFlow.writePackets([data], withProtocols: [NSNumber(value: AF_INET)])
+                } else {
+                    // 如果没有数据，短暂休眠避免空转占用 CPU
+                    // 在高性能场景可使用条件变量或 semaphore 优化
+                    poll_stack() // 确保定时器等事件被处理
+                    Thread.sleep(forTimeInterval: 0.005) // 5ms
                 }
             }
-        } else if let udp_flow = flow as? NEAppProxyUDPFlow {
-            guard let localEndpoint = udp_flow.localEndpoint as? NWHostEndpoint else {
-                throw TransparentProxyError.noLocalEndpoint
-            }
-            message = MitmproxyIpc_NewFlow.with {
-                $0.udp = MitmproxyIpc_UdpFlow.with {
-                    $0.localAddress = MitmproxyIpc_Address.init(endpoint: localEndpoint)
-                    $0.tunnelInfo = tunnelInfo
-                }
-            }
-        } else {
-            throw TransparentProxyError.unexpectedFlow
         }
-        return message
+    }
+
+    private func stringConfigValue(key: String, options: [String: NSObject]?) -> String? {
+        if let value = options?[key] as? String {
+            return value
+        }
+        if let value = options?[key] as? NSString {
+            return value as String
+        }
+        if let providerConfig = (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration {
+            if let value = providerConfig[key] as? String {
+                return value
+            }
+            if let value = providerConfig[key] as? NSString {
+                return value as String
+            }
+        }
+        return nil
     }
 }
+
+// FFI Declarations for Rust core
+@_silgen_name("init_stack")
+func init_stack() -> Int32
+
+@_silgen_name("shutdown_stack")
+func shutdown_stack()
+
+@_silgen_name("process_packet")
+func process_packet(_ data: UnsafePointer<UInt8>, _ len: Int) -> Int32
+
+@_silgen_name("get_outbound_packet")
+func get_outbound_packet(_ buffer: UnsafeMutablePointer<UInt8>, _ max_len: Int, _ written_len: UnsafeMutablePointer<Int>) -> Int32
+
+@_silgen_name("poll_stack")
+func poll_stack()
+
+@_silgen_name("set_device_info")
+func set_device_info(
+    _ pin_number: UnsafePointer<CChar>,
+    _ ip: UnsafePointer<CChar>,
+    _ mac: UnsafePointer<CChar>,
+    _ cpe_id: UnsafePointer<CChar>,
+    _ host_id: UnsafePointer<CChar>
+)
+
+@_silgen_name("set_audit_policy")
+func set_audit_policy(_ policy_json: UnsafePointer<CChar>) -> Int32
