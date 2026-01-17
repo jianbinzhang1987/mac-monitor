@@ -454,6 +454,18 @@ async fn get_screenshot_logs() -> Result<serde_json::Value, String> {
     }
 }
 
+#[tauri::command]
+async fn get_clipboard_logs() -> Result<serde_json::Value, String> {
+    let res_str = send_ipc_command("get_clipboard_logs", serde_json::Value::Null).await?;
+    let res: IpcResponse = serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
+
+    if res.status == "ok" {
+        Ok(res.payload.unwrap_or(serde_json::json!([])))
+    } else {
+        Err(res.message)
+    }
+}
+
 fn main() {
     let app_state = ManagedState(Arc::new(Mutex::new(AppState {
         is_logged_in: false,
@@ -554,7 +566,7 @@ fn main() {
             start_vpn, stop_vpn, get_vpn_status,
             enable_proxy, disable_proxy,
             enable_monitoring, disable_monitoring,
-            get_screenshot_logs
+            get_screenshot_logs, get_clipboard_logs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

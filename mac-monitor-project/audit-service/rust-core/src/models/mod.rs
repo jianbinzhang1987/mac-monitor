@@ -60,6 +60,23 @@ pub struct ScreenshotLog {
     pub redaction_labels: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClipboardLog {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<i64>,
+    pub app_name: String,
+    pub bundle_id: String,
+    pub op_time: String,
+    pub content: String,
+    pub content_type: String,
+    pub risk_level: i32,
+    #[serde(rename = "cpe_id")]
+    pub cpe_id: String,
+    pub host_id: String,
+    pub mac: String,
+    pub ip: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct DeviceInfo {
     pub pin: String,

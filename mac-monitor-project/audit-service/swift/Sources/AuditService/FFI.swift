@@ -29,6 +29,15 @@ func rust_register_device(
     _ pin: UnsafePointer<CChar>
 ) -> Bool
 
+@_silgen_name("log_clipboard_event")
+func rust_log_clipboard_event(
+    _ app_name: UnsafePointer<CChar>,
+    _ bundle_id: UnsafePointer<CChar>,
+    _ content: UnsafePointer<CChar>,
+    _ content_type: UnsafePointer<CChar>,
+    _ risk_level: Int32
+)
+
 @_silgen_name("update_redaction_status")
 func rust_update_redaction_status(_ enabled: Bool) {
     if #available(macOS 12.3, *) {

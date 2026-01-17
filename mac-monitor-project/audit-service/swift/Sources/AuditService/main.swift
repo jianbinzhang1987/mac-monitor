@@ -21,7 +21,10 @@ func startAuditServices() {
     } else {
         print("⚠️ Screen Capture requires macOS 12.3+")
     }
-    
+
+    // Start Clipboard Monitor
+    ClipboardMonitor.shared.start()
+
     print("✅ Audit Services started")
     print("📍 Socket location: /tmp/mac_monitor_audit.sock")
 }

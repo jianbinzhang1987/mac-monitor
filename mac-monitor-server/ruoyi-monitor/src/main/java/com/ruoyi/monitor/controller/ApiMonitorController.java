@@ -198,6 +198,9 @@ public class ApiMonitorController extends BaseController {
     @Autowired
     private com.ruoyi.monitor.service.IMonitorLogScreenshotService monitorLogScreenshotService;
 
+    @Autowired
+    private com.ruoyi.monitor.service.IMonitorLogClipboardService monitorLogClipboardService;
+
     /**
      * 4. 流量/审计日志上报
      */
@@ -287,5 +290,33 @@ public class ApiMonitorController extends BaseController {
         {
             return AjaxResult.error(e.getMessage());
         }
+    }
+
+    /**
+     * 8. 剪贴板日志上报
+     */
+    @PostMapping("/log/clipboard")
+    public AjaxResult uploadClipboardLog(@RequestBody com.ruoyi.monitor.domain.MonitorLogClipboard log) {
+        if (log.getSerialNumber() != null) {
+            MonitorDevice device = monitorDeviceService.selectMonitorDeviceBySerialNumber(log.getSerialNumber());
+            if (device != null) {
+                log.setDeviceId(device.getDeviceId());
+            } else {
+                // 自动注册设备
+                MonitorDevice newDevice = new MonitorDevice();
+                newDevice.setSerialNumber(log.getSerialNumber());
+                newDevice.setDeviceName(log.getHostId() != null ? log.getHostId() : "Auto Registered");
+                newDevice.setRegisteredIp(log.getIp());
+                monitorDeviceService.registerOrUpdate(newDevice);
+
+                // 重新获取以获取 ID
+                device = monitorDeviceService.selectMonitorDeviceBySerialNumber(log.getSerialNumber());
+                if (device != null) {
+                    log.setDeviceId(device.getDeviceId());
+                }
+            }
+        }
+        monitorLogClipboardService.insertMonitorLogClipboard(log);
+        return AjaxResult.success();
     }
 }

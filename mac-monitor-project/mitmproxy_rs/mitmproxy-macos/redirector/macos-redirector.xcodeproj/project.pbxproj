@@ -534,6 +534,7 @@
 				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
 				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
 				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
 				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;				PRODUCT_MODULE_NAME = network_extension;				PRODUCT_MODULE_NAME = network_extension;				PRODUCT_NAME = "$(inherited)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Mac Monitor NE Network Extension";
@@ -566,6 +567,7 @@
 				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.mac-monitor-gui.app.network-extension";
 				PRODUCT_MODULE_NAME = network_extension;
+				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
 				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
 				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;
 				PRODUCT_NAME = "network-extension";				PRODUCT_MODULE_NAME = network_extension;

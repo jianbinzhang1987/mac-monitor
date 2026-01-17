@@ -16,7 +16,7 @@ use std::io::Cursor;
 use chrono::Local;
 
 use crate::db::Database;
-use crate::models::{AuditLog, ScreenshotLog, BehaviorLog};
+use crate::models::{AuditLog, BehaviorLog, ClipboardLog, ScreenshotLog};
 use crate::uploader::Uploader;
 use crate::uploader::sync::SyncService;
 use crate::clock::LogicalClock;
@@ -445,6 +445,62 @@ pub extern "C" fn analyze_enhanced_image(
     });
 }
 
+
+#[no_mangle]
+pub extern "C" fn log_clipboard_event(
+    app_name: *const c_char,
+    bundle_id: *const c_char,
+    content: *const c_char,
+    content_type: *const c_char,
+    risk_level: i32,
+) {
+    let app_name_str = if !app_name.is_null() {
+        unsafe { CStr::from_ptr(app_name).to_string_lossy().into_owned() }
+    } else {
+        "Unknown".to_string()
+    };
+
+    let bundle_id_str = if !bundle_id.is_null() {
+        unsafe { CStr::from_ptr(bundle_id).to_string_lossy().into_owned() }
+    } else {
+        "Unknown".to_string()
+    };
+
+    let content_str = if !content.is_null() {
+        unsafe { CStr::from_ptr(content).to_string_lossy().into_owned() }
+    } else {
+        String::new()
+    };
+
+    let content_type_str = if !content_type.is_null() {
+        unsafe { CStr::from_ptr(content_type).to_string_lossy().into_owned() }
+    } else {
+        "text/plain".to_string()
+    };
+
+    RUNTIME.spawn(async move {
+        let ctx = get_service_context().await;
+        let log = ClipboardLog {
+            id: None,
+            app_name: app_name_str,
+            bundle_id: bundle_id_str,
+            op_time: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            content: content_str,
+            content_type: content_type_str,
+            risk_level,
+            cpe_id: ctx.device_info.cpe_id.clone(),
+            host_id: ctx.device_info.host_id.clone(),
+            mac: ctx.device_info.mac.clone(),
+            ip: ctx.device_info.ip.clone(),
+        };
+
+        if let Err(e) = ctx.db.save_clipboard_log(&log).await {
+            log::error!("Failed to save clipboard log: {}", e);
+        } else {
+            log::info!("📋 Clipboard event logged: {} ({})", log.app_name, log.bundle_id);
+        }
+    });
+}
 
 #[no_mangle]
 pub extern "C" fn register_device(

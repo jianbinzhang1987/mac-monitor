@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.monitor.mapper.MonitorLogClipboardMapper">
+
+    <resultMap type="MonitorLogClipboard" id="MonitorLogClipboardResult">
+        <result property="logId"    column="log_id"    />
+        <result property="serialNumber"    column="serial_number"    />
+        <result property="deviceId"    column="device_id"    />
+        <result property="opTime"    column="op_time"    />
+        <result property="appName"    column="app_name"    />
+        <result property="bundleId"    column="bundle_id"    />
+        <result property="content"    column="content"    />
+        <result property="contentType"    column="content_type"    />
+        <result property="riskLevel"    column="risk_level"    />
+        <result property="hostId"    column="host_id"    />
+        <result property="mac"    column="mac"    />
+        <result property="ip"    column="ip"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectMonitorLogClipboardVo">
+        select log_id, serial_number, device_id, op_time, app_name, bundle_id, content, content_type, risk_level, host_id, mac, ip, create_time from monitor_log_clipboard
+    </sql>
+
+    <select id="selectMonitorLogClipboardList" parameterType="MonitorLogClipboard" resultMap="MonitorLogClipboardResult">
+        <include refid="selectMonitorLogClipboardVo"/>
+        <where>
+            <if test="serialNumber != null  and serialNumber != ''"> and serial_number = #{serialNumber}</if>
+            <if test="deviceId != null "> and device_id = #{deviceId}</if>
+            <if test="opTime != null "> and op_time = #{opTime}</if>
+            <if test="appName != null  and appName != ''"> and app_name like concat('%', #{appName}, '%')</if>
+            <if test="bundleId != null  and bundleId != ''"> and bundle_id = #{bundleId}</if>
+            <if test="content != null  and content != ''"> and content like concat('%', #{content}, '%')</if>
+            <if test="contentType != null  and contentType != ''"> and content_type = #{contentType}</if>
+            <if test="riskLevel != null "> and risk_level = #{riskLevel}</if>
+            <if test="hostId != null  and hostId != ''"> and host_id = #{hostId}</if>
+            <if test="mac != null  and mac != ''"> and mac = #{mac}</if>
+            <if test="ip != null  and ip != ''"> and ip = #{ip}</if>
+        </where>
+        order by op_time desc
+    </select>
+
+    <select id="selectMonitorLogClipboardByLogId" parameterType="Long" resultMap="MonitorLogClipboardResult">
+        <include refid="selectMonitorLogClipboardVo"/>
+        where log_id = #{logId}
+    </select>
+
+    <insert id="insertMonitorLogClipboard" parameterType="MonitorLogClipboard" useGeneratedKeys="true" keyProperty="logId">
+        insert into monitor_log_clipboard
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="serialNumber != null">serial_number,</if>
+            <if test="deviceId != null">device_id,</if>
+            <if test="opTime != null">op_time,</if>
+            <if test="appName != null">app_name,</if>
+            <if test="bundleId != null">bundle_id,</if>
+            <if test="content != null">content,</if>
+            <if test="contentType != null">content_type,</if>
+            <if test="riskLevel != null">risk_level,</if>
+            <if test="hostId != null">host_id,</if>
+            <if test="mac != null">mac,</if>
+            <if test="ip != null">ip,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="serialNumber != null">#{serialNumber},</if>
+            <if test="deviceId != null">#{deviceId},</if>
+            <if test="opTime != null">#{opTime},</if>
+            <if test="appName != null">#{appName},</if>
+            <if test="bundleId != null">#{bundleId},</if>
+            <if test="content != null">#{content},</if>
+            <if test="contentType != null">#{contentType},</if>
+            <if test="riskLevel != null">#{riskLevel},</if>
+            <if test="hostId != null">#{hostId},</if>
+            <if test="mac != null">#{mac},</if>
+            <if test="ip != null">#{ip},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateMonitorLogClipboard" parameterType="MonitorLogClipboard">
+        update monitor_log_clipboard
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="serialNumber != null">serial_number = #{serialNumber},</if>
+            <if test="deviceId != null">device_id = #{deviceId},</if>
+            <if test="opTime != null">op_time = #{opTime},</if>
+            <if test="appName != null">app_name = #{appName},</if>
+            <if test="bundleId != null">bundle_id = #{bundleId},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="contentType != null">content_type = #{contentType},</if>
+            <if test="riskLevel != null">risk_level = #{riskLevel},</if>
+            <if test="hostId != null">host_id = #{hostId},</if>
+            <if test="mac != null">mac = #{mac},</if>
+            <if test="ip != null">ip = #{ip},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+        </trim>
+        where log_id = #{logId}
+    </update>
+
+    <delete id="deleteMonitorLogClipboardByLogId" parameterType="Long">
+        delete from monitor_log_clipboard where log_id = #{logId}
+    </delete>
+
+    <delete id="deleteMonitorLogClipboardByLogIds" parameterType="String">
+        delete from monitor_log_clipboard where log_id in
+        <foreach item="logId" collection="array" open="(" separator="," close=")">
+            #{logId}
+        </foreach>
+    </delete>
+</mapper>

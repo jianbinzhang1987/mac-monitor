@@ -150,6 +150,21 @@ impl SyncService {
             }
         }
 
+        // 4. 同步剪贴板日志
+        let clipboard_logs = self.db.get_unsent_clipboard_logs().await.map_err(|e| e.to_string())?;
+        for log in clipboard_logs {
+            match self.uploader.upload_data("/api/v1/log/clipboard", &log).await {
+                Ok(_) => {
+                    if let Some(id) = log.id {
+                        self.db.mark_clipboard_log_sent(id).await.map_err(|e| e.to_string())?;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to upload clipboard log {:?}: {}", log.id, e);
+                }
+            }
+        }
+
         Ok(())
     }
 

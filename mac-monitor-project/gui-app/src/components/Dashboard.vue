@@ -11,6 +11,7 @@ import {
   SyncOutlined,
   InfoCircleOutlined,
   LogoutOutlined,
+  CopyOutlined,
 } from '@ant-design/icons-vue';
 import { invoke } from '@tauri-apps/api/core';
 import { message } from 'ant-design-vue';
@@ -19,6 +20,7 @@ import TrafficAudit from './TrafficAudit.vue';
 import ProcessProtection from './ProcessProtection.vue';
 import FileSecurity from './FileSecurity.vue';
 import ScreenshotRecord from './ScreenshotRecord.vue';
+import ClipboardAudit from './ClipboardAudit.vue';
 
 
 const collapsed = ref<boolean>(false);
@@ -99,6 +101,7 @@ const handleCheckUpdate = async () => {
             <a-menu-item key="3"><safety-certificate-outlined /> 进程防护</a-menu-item>
             <a-menu-item key="4"><file-outlined /> 文件安全</a-menu-item>
             <a-menu-item key="5"><camera-outlined /> 截屏记录</a-menu-item>
+            <a-menu-item key="7"><copy-outlined /> 剪贴板审计</a-menu-item>
           </a-sub-menu>
           <a-menu-item key="6">
             <sync-outlined />
@@ -118,13 +121,8 @@ const handleCheckUpdate = async () => {
           </div>
           <div class="header-right">
             <GlobalOutlined class="pop-icon" />
-            <a-select
-              v-model:value="currentPop"
-              class="pop-select"
-              :loading="loadingPop"
-              @change="handlePopChange"
-              :bordered="false"
-            >
+            <a-select v-model:value="currentPop" class="pop-select" :loading="loadingPop" @change="handlePopChange"
+              :bordered="false">
               <a-select-option v-for="node in popNodes" :key="node.id" :value="node.id">
                 {{ node.name }} ({{ node.latency }}ms)
               </a-select-option>
@@ -139,13 +137,14 @@ const handleCheckUpdate = async () => {
           </div>
         </a-layout-header>
 
-  <!-- 内容区 -->
+        <!-- 内容区 -->
         <a-layout-content class="content-wrapper">
           <Overview v-if="selectedKeys[0] === '1'" />
           <TrafficAudit v-else-if="selectedKeys[0] === '2'" />
           <ProcessProtection v-else-if="selectedKeys[0] === '3'" />
           <FileSecurity v-else-if="selectedKeys[0] === '4'" />
           <ScreenshotRecord v-else-if="selectedKeys[0] === '5'" />
+          <ClipboardAudit v-else-if="selectedKeys[0] === '7'" />
           <div v-else class="coming-soon">
             <a-empty description="功能模块开发中" />
           </div>
@@ -199,7 +198,8 @@ const handleCheckUpdate = async () => {
   border-right: none !important;
 }
 
-:deep(.ant-menu-item), :deep(.ant-menu-submenu-title) {
+:deep(.ant-menu-item),
+:deep(.ant-menu-submenu-title) {
   color: #94a3b8 !important;
   margin: 4px 8px !important;
   border-radius: 8px !important;
@@ -244,9 +244,17 @@ const handleCheckUpdate = async () => {
 }
 
 @keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
 .status-text {
@@ -345,10 +353,25 @@ const handleCheckUpdate = async () => {
   font-size: 20px;
 }
 
-.stat-icon-wrap.blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-.stat-icon-wrap.red { background: rgba(244, 63, 94, 0.1); color: #f43f5e; }
-.stat-icon-wrap.green { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.stat-icon-wrap.orange { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.stat-icon-wrap.blue {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.stat-icon-wrap.red {
+  background: rgba(244, 63, 94, 0.1);
+  color: #f43f5e;
+}
+
+.stat-icon-wrap.green {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.stat-icon-wrap.orange {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
 
 .stat-label {
   font-size: 13px;
@@ -372,7 +395,9 @@ const handleCheckUpdate = async () => {
   min-height: 400px;
 }
 
-.mt-24 { margin-top: 24px; }
+.mt-24 {
+  margin-top: 24px;
+}
 
 :deep(.ant-tabs-tab) {
   color: #94a3b8 !important;

@@ -56,3 +56,21 @@ CREATE INDEX IF NOT EXISTS idx_audit_uploaded ON audit_logs(is_uploaded);
 CREATE INDEX IF NOT EXISTS idx_behavior_uploaded ON behavior_logs(is_uploaded);
 CREATE INDEX IF NOT EXISTS idx_screenshot_uploaded ON screenshot_logs(is_uploaded);
 CREATE INDEX IF NOT EXISTS idx_screenshot_hash ON screenshot_logs(image_hash);
+
+CREATE TABLE IF NOT EXISTS clipboard_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_name TEXT,
+    bundle_id TEXT,
+    op_time TEXT,
+    content TEXT,
+    content_type TEXT,
+    risk_level INTEGER,
+    host_id TEXT,
+    cpe_id TEXT,
+    mac TEXT,
+    ip TEXT,
+    is_uploaded INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_clipboard_uploaded ON clipboard_logs(is_uploaded);

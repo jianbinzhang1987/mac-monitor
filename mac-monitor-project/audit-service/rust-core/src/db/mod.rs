@@ -1,6 +1,6 @@
 use sqlx::{sqlite::SqliteConnectOptions, Row, SqlitePool};
 use std::str::FromStr;
-use crate::models::{AuditLog, BehaviorLog, ScreenshotLog};
+use crate::models::{AuditLog, BehaviorLog, ClipboardLog, ScreenshotLog};
 
 pub struct Database {
     pool: SqlitePool,
@@ -86,6 +86,28 @@ impl Database {
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_screenshot_hash ON screenshot_logs(image_hash)")
             .execute(&self.pool).await?;
 
+        // 创建剪贴板日志表
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS clipboard_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                app_name TEXT,
+                bundle_id TEXT,
+                op_time TEXT,
+                content TEXT,
+                content_type TEXT,
+                risk_level INTEGER,
+                host_id TEXT,
+                cpe_id TEXT,
+                mac TEXT,
+                ip TEXT,
+                is_uploaded INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )"
+        ).execute(&self.pool).await?;
+
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_clipboard_uploaded ON clipboard_logs(is_uploaded)")
+            .execute(&self.pool).await?;
+
         // 数据库迁移：尝试添加新字段 (忽略已存在的错误)
         // Behavior Logs
         let _ = sqlx::query("ALTER TABLE behavior_logs ADD COLUMN host_id TEXT").execute(&self.pool).await;
@@ -162,6 +184,26 @@ impl Database {
         .bind(&log.mac)
         .bind(&log.ip)
         .bind(&log.redaction_labels)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn save_clipboard_log(&self, log: &ClipboardLog) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT INTO clipboard_logs (app_name, bundle_id, op_time, content, content_type, risk_level, host_id, cpe_id, mac, ip)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(&log.app_name)
+        .bind(&log.bundle_id)
+        .bind(&log.op_time)
+        .bind(&log.content)
+        .bind(&log.content_type)
+        .bind(log.risk_level)
+        .bind(&log.host_id)
+        .bind(&log.cpe_id)
+        .bind(&log.mac)
+        .bind(&log.ip)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -312,5 +354,89 @@ impl Database {
             .await?;
         let count: i64 = row.try_get("count")?;
         Ok(count > 0)
+    }
+
+    pub async fn get_unsent_clipboard_logs(&self) -> Result<Vec<ClipboardLog>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT
+                id,
+                app_name,
+                bundle_id,
+                op_time,
+                content,
+                content_type,
+                risk_level,
+                cpe_id,
+                host_id,
+                mac,
+                ip
+            FROM clipboard_logs WHERE is_uploaded = 0 LIMIT 20"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut logs = Vec::with_capacity(rows.len());
+        for row in rows {
+            logs.push(ClipboardLog {
+                id: Some(row.try_get::<i64, _>("id")?),
+                app_name: row.try_get("app_name")?,
+                bundle_id: row.try_get("bundle_id")?,
+                op_time: row.try_get("op_time")?,
+                content: row.try_get("content")?,
+                content_type: row.try_get("content_type")?,
+                risk_level: row.try_get("risk_level")?,
+                cpe_id: row.try_get("cpe_id")?,
+                host_id: row.try_get("host_id")?,
+                mac: row.try_get("mac")?,
+                ip: row.try_get("ip")?,
+            });
+        }
+        Ok(logs)
+    }
+
+    pub async fn mark_clipboard_log_sent(&self, id: i64) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE clipboard_logs SET is_uploaded = 1 WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_all_clipboard_logs(&self) -> Result<Vec<ClipboardLog>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT
+                id,
+                app_name,
+                bundle_id,
+                op_time,
+                content,
+                content_type,
+                risk_level,
+                cpe_id,
+                host_id,
+                mac,
+                ip
+            FROM clipboard_logs ORDER BY op_time DESC LIMIT 100"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut logs = Vec::with_capacity(rows.len());
+        for row in rows {
+            logs.push(ClipboardLog {
+                id: Some(row.try_get::<i64, _>("id")?),
+                app_name: row.try_get("app_name")?,
+                bundle_id: row.try_get("bundle_id")?,
+                op_time: row.try_get("op_time")?,
+                content: row.try_get("content")?,
+                content_type: row.try_get("content_type")?,
+                risk_level: row.try_get("risk_level")?,
+                cpe_id: row.try_get("cpe_id")?,
+                host_id: row.try_get("host_id")?,
+                mac: row.try_get("mac")?,
+                ip: row.try_get("ip")?,
+            });
+        }
+        Ok(logs)
     }
 }

@@ -1,0 +1,61 @@
+
+> mac-monitor-gui@0.1.0 tauri
+> tauri build
+
+        Info Looking up installed tauri packages to check mismatched versions...
+        Warn The bundle identifier "com.mac-monitor-gui.app" set in `tauri.conf.json identifier` ends with `.app`. This is not recommended because it conflicts with the application bundle extension on macOS.
+     Running beforeBuildCommand `npm run build`
+
+> mac-monitor-gui@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 3177 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.46 kB │ gzip:   0.30 kB
+dist/assets/index-B8M_77B0.css     17.09 kB │ gzip:   3.90 kB
+dist/assets/index-CfJGUMCa.js   1,524.87 kB │ gzip: 470.00 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 7.59s
+warning: function `copy_dir_all` is never used
+ --> build.rs:8:4
+  |
+8 | fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+  |    ^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mac-monitor-gui-core` (build script) generated 1 warning
+   Compiling mac-monitor-gui-core v0.1.0 (/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri)
+warning: unused variable: `bundle_path`
+   --> src/main.rs:369:9
+    |
+369 |     let bundle_path = handle.path().resource_dir().map_err(|e| e.to_string())?;
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bundle_path`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `device_info_path` is never used
+   --> src/main.rs:122:4
+    |
+122 | fn device_info_path(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    |    ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mac-monitor-gui-core` (bin "mac-monitor-gui-core") generated 2 warnings (run `cargo fix --bin "mac-monitor-gui-core" -p mac-monitor-gui-core` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 50.37s
+       Built application at: /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/target/release/mac-monitor-gui-core
+    Bundling Mac Monitor.app (/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/target/release/bundle/macos/Mac Monitor.app)
+    Bundling Mac Monitor_0.1.0_x64.dmg (/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/target/release/bundle/dmg/Mac Monitor_0.1.0_x64.dmg)
+     Running bundle_dmg.sh
+    Finished 2 bundles at:
+        /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/target/release/bundle/macos/Mac Monitor.app
+        /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/target/release/bundle/dmg/Mac Monitor_0.1.0_x64.dmg
+

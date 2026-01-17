@@ -1,0 +1,450 @@
++++ dirname ./mac-monitor-project/build_all.sh
+++ cd ./mac-monitor-project
+++ pwd
++ SCRIPT_DIR=/Users/adolf/Desktop/code/clash/mac-monitor-project
++ export PROJECT_ROOT=/Users/adolf/Desktop/code/clash/mac-monitor-project
++ PROJECT_ROOT=/Users/adolf/Desktop/code/clash/mac-monitor-project
++ echo '📍 项目根目录: /Users/adolf/Desktop/code/clash/mac-monitor-project'
+📍 项目根目录: /Users/adolf/Desktop/code/clash/mac-monitor-project
+++ uname -m
++ ARCH_NAME=x86_64
++ '[' x86_64 = x86_64 ']'
++ TARGET_TRIPLE=x86_64-apple-darwin
++ XCODE_ARCH=x86_64
++ echo '🖥️  检测到架构: x86_64 (Rust Target: x86_64-apple-darwin, Xcode Arch: x86_64)'
+🖥️  检测到架构: x86_64 (Rust Target: x86_64-apple-darwin, Xcode Arch: x86_64)
++ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
++ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
++ echo ''
+
++ echo '🦀 [1/4] 构建 Network Extension Rust Core...'
+🦀 [1/4] 构建 Network Extension Rust Core...
++ cd /Users/adolf/Desktop/code/clash/mac-monitor-project/network-extension/rust-core
++ cargo build --release
+warning: unused import: `smoltcp::wire::IpAddress`
+ --> src/stack.rs:7:5
+  |
+7 | use smoltcp::wire::IpAddress;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `smoltcp::wire::IpEndpoint`
+ --> src/dns.rs:9:5
+  |
+9 | use smoltcp::wire::IpEndpoint;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `url`
+  --> src/mitm.rs:99:13
+   |
+99 |         let url = if path.starts_with("http://") || path.starts_with("https://") {
+   |             ^^^ help: if this is intentional, prefix it with an underscore: `_url`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `ptr`
+   --> src/lib.rs:174:5
+    |
+174 |     ptr: *const u8,
+    |     ^^^ help: if this is intentional, prefix it with an underscore: `_ptr`
+
+warning: unused variable: `len`
+   --> src/lib.rs:175:5
+    |
+175 |     len: usize,
+    |     ^^^ help: if this is intentional, prefix it with an underscore: `_len`
+
+warning: unused variable: `width`
+   --> src/lib.rs:176:5
+    |
+176 |     width: u32,
+    |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_width`
+
+warning: unused variable: `height`
+   --> src/lib.rs:177:5
+    |
+177 |     height: u32,
+    |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_height`
+
+warning: function `response_body_for_url` is never used
+   --> src/mitm.rs:270:8
+    |
+270 | pub fn response_body_for_url(url: &str, body: &[u8]) -> Option<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `website_rsp_config_array` is never read
+   --> src/mitm.rs:338:5
+    |
+332 | struct AuditPolicy {
+    |        ----------- field in this struct
+...
+338 |     website_rsp_config_array: Vec<ResponseConfig>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `AuditPolicy` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `id` is never read
+   --> src/mitm.rs:345:5
+    |
+342 | struct WhiteDomain {
+    |        ----------- field in this struct
+...
+345 |     id: Option<String>,
+    |     ^^
+    |
+    = note: `WhiteDomain` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `rspbodylength` and `url` are never read
+   --> src/mitm.rs:358:5
+    |
+356 | struct ResponseConfig {
+    |        -------------- fields in this struct
+357 |     #[serde(default)]
+358 |     rspbodylength: usize,
+    |     ^^^^^^^^^^^^^
+359 |     #[serde(default)]
+360 |     url: String,
+    |     ^^^
+    |
+    = note: `ResponseConfig` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: `network-procotol-stack` (lib) generated 11 warnings (run `cargo fix --lib -p network-procotol-stack` to apply 7 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.68s
++ RUST_LIB_PATH=/Users/adolf/Desktop/code/clash/mac-monitor-project/network-extension/rust-core/target/release/libnetwork_procotol_stack.a
++ '[' '!' -f /Users/adolf/Desktop/code/clash/mac-monitor-project/network-extension/rust-core/target/release/libnetwork_procotol_stack.a ']'
++ echo '✅ Rust Core 构建完成'
+✅ Rust Core 构建完成
++ echo ''
+
++ echo '🔌 [2/4] 构建 Network Extension (.appex)...'
+🔌 [2/4] 构建 Network Extension (.appex)...
++ NE_PROJECT_DIR=/Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector
++ cd /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector
++ PBXPROJ=/Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/macos-redirector.xcodeproj/project.pbxproj
++ INFO_PLIST=/Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/network-extension/Info.plist
++ plutil -replace NSSystemExtensionUsageDescription -string 'Monitor network traffic' /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/network-extension/Info.plist
++ plutil -replace CFBundleDisplayName -string 'Mac Monitor Extension' /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/network-extension/Info.plist
++ plutil -replace CFBundleName -string 'Mac Monitor Extension' /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/network-extension/Info.plist
++ sed -i '' /CODE_SIGN_ENTITLEMENTS/d /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/macos-redirector.xcodeproj/project.pbxproj
++ sed -i '' s/org.mitmproxy.macos-redirector/com.mac-monitor-gui.app/g /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/macos-redirector.xcodeproj/project.pbxproj
++ sed -i '' '/PRODUCT_BUNDLE_IDENTIFIER = "com.mac-monitor-gui.app.network-extension";/a\
+				PRODUCT_MODULE_NAME = network_extension;\
+				PRODUCT_NAME = "network-extension";' /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/macos-redirector.xcodeproj/project.pbxproj
++ echo '   正在清理旧构建...'
+   正在清理旧构建...
++ rm -rf /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build
++ echo '   正在解析依赖...'
+   正在解析依赖...
++ xcodebuild -project macos-redirector.xcodeproj -resolvePackageDependencies
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project macos-redirector.xcodeproj -resolvePackageDependencies
+
+User defaults from command line:
+    IDEPackageSupportUseBuiltinSCM = YES
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  SwiftProtobuf: https://github.com/apple/swift-protobuf.git @ 1.22.1
+
+resolved source packages: SwiftProtobuf
++ echo '   正在执行 xcodebuild (Target: network-extension)...'
+   正在执行 xcodebuild (Target: network-extension)...
++ xcodebuild -project macos-redirector.xcodeproj -target network-extension -configuration Release build -jobs 4 CODE_SIGN_IDENTITY= CODE_SIGNING_REQUIRED=NO SIGNING_ALLOWED=NO DEVELOPMENT_TEAM= 'OTHER_LDFLAGS=-force_load /Users/adolf/Desktop/code/clash/mac-monitor-project/network-extension/rust-core/target/release/libnetwork_procotol_stack.a -framework Security -framework NetworkExtension -framework SystemConfiguration -framework CoreFoundation' -arch x86_64 SYMROOT=/Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build
+++ find /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build -name '*.appex'
+++ head -n 1
++ APPEX_PATH=/Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/.appex
++ '[' -n /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/.appex ']'
+++ basename /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/.appex
++ '[' .appex == .appex ']'
++ echo '⚠️  发现隐形文件 .appex, 正在重命名...'
+⚠️  发现隐形文件 .appex, 正在重命名...
+++ dirname /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/.appex
++ mv /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/.appex /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex
+++ dirname /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/.appex
++ APPEX_PATH=/Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex
++ echo '   正在修复 .appex 内部结构与元数据...'
+   正在修复 .appex 内部结构与元数据...
++ NE_INFO_PLIST=/Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex/Contents/Info.plist
++ plutil -replace CFBundleExecutable -string network-extension /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex/Contents/Info.plist
++ '[' -f /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex/Contents/MacOS ']'
++ echo '   ⚠️  检测到 MacOS 为文件, 正在转换为目录...'
+   ⚠️  检测到 MacOS 为文件, 正在转换为目录...
++ mv /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex/Contents/MacOS /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex/Contents/network-extension
++ mkdir -p /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex/Contents/MacOS
++ mv /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex/Contents/network-extension /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex/Contents/MacOS/network-extension
++ chmod +x /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex/Contents/MacOS/network-extension
++ '[' -z /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex ']'
++ echo '✅ Network Extension 构建成功: /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex'
+✅ Network Extension 构建成功: /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex
++ echo ''
+
++ echo '🛡️  [3/4] 构建 AuditService (Sidecar)...'
+🛡️  [3/4] 构建 AuditService (Sidecar)...
++ cd /Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift
++ swift build -c release
+warning: unable to restore workspace state: unknown 'WorkspaceStateStorage' version '7' at '/Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/.build/workspace-state.json'
+warning: 'swift': found 1 file(s) which are unhandled; explicitly declare them as resources or exclude from the target
+    /Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/Sources/AuditService/Info.plist
+[0/1] Planning build
+Building for production...
+[0/3] Write sources
+[1/3] Write swift-version--58304C5D6DBC2206.txt
+[3/4] Compiling AuditService AuditIPCServer.swift
+/Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/Sources/AuditService/AuditIPCServer.swift:21:17: warning: initialization of immutable value 'endpoint' was never used; consider replacing with assignment to '_' or removing it
+ 19 |             // 使用 Network.framework 监听 Unix Domain Socket
+ 20 |             // 注意：在 macOS 12+ 建议使用 NWListener
+ 21 |             let endpoint = NWEndpoint.unix(path: socketPath)
+    |                 `- warning: initialization of immutable value 'endpoint' was never used; consider replacing with assignment to '_' or removing it
+ 22 |             let params = NWParameters.tcp
+ 23 |             // 这里通常需要自定义参数来支持 Unix Domain Socket，
+
+/Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/Sources/AuditService/AuditIPCServer.swift:22:17: warning: initialization of immutable value 'params' was never used; consider replacing with assignment to '_' or removing it
+ 20 |             // 注意：在 macOS 12+ 建议使用 NWListener
+ 21 |             let endpoint = NWEndpoint.unix(path: socketPath)
+ 22 |             let params = NWParameters.tcp
+    |                 `- warning: initialization of immutable value 'params' was never used; consider replacing with assignment to '_' or removing it
+ 23 |             // 这里通常需要自定义参数来支持 Unix Domain Socket，
+ 24 |             // 简化演示：我们使用更传统的 POSIX Socket 接口实现
+
+/Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/Sources/AuditService/AuditIPCServer.swift:28:11: warning: 'catch' block is unreachable because no errors are thrown in 'do' block
+ 26 |             startPosixSocketServer()
+ 27 |             
+ 28 |         } catch {
+    |           `- warning: 'catch' block is unreachable because no errors are thrown in 'do' block
+ 29 |             print("❌ Failed to start IPC Server: \(error)")
+ 30 |         }
+
+/Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/Sources/AuditService/AuditIPCServer.swift:51:34: warning: initialization of 'UnsafeRawPointer' results in a dangling pointer
+ 49 |             unlink(self.socketPath)
+ 50 |             
+ 51 |             guard bind(serverFd, UnsafeRawPointer(&addr).assumingMemoryBound(to: sockaddr.self), len) >= 0 else {
+    |                                  |                |- note: implicit argument conversion from 'sockaddr_un' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'init(_:)'
+    |                                  |                `- note: use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope
+    |                                  `- warning: initialization of 'UnsafeRawPointer' results in a dangling pointer
+ 52 |                 print("❌ Bind failed")
+ 53 |                 return
+[3/5] Write Objects.LinkFileList
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[416](25ac62e5b3c53843-curve25519.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[417](0bbbd18bda93c05b-aes_nohw.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[418](00c879ee3285a50d-montgomery.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[419](00c879ee3285a50d-montgomery_inv.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[420](a0330e891e733f4e-ecp_nistz.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[422](a0330e891e733f4e-gfp_p384.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[424](aaa1ba3e455ee2e1-limbs.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[425](a4019cc0736b0423-mem.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[426](d5a9841f3dc6e253-poly1305.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[427](a4019cc0736b0423-crypto.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[428](a4019cc0736b0423-cpu_intel.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[429](25ac62e5b3c53843-curve25519_64_adx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[430](e165cd818145c705-fiat_curve25519_adx_mul.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[431](e165cd818145c705-fiat_curve25519_adx_square.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[432](a0330e891e733f4e-p256-nistz.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[433](c322a0bcc369f531-chacha-x86_64-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[434](c322a0bcc369f531-aes-gcm-avx2-x86_64-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[435](c322a0bcc369f531-aesni-gcm-x86_64-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[436](c322a0bcc369f531-aesni-x86_64-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[437](c322a0bcc369f531-ghash-x86_64-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[438](c322a0bcc369f531-vpaes-x86_64-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[439](c322a0bcc369f531-x86_64-mont-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[440](c322a0bcc369f531-x86_64-mont5-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[441](c322a0bcc369f531-p256-x86_64-asm-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[442](c322a0bcc369f531-sha512-x86_64-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[443](c322a0bcc369f531-chacha20_poly1305_x86_64-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[444](c322a0bcc369f531-sha256-x86_64-macosx.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+ld: warning: object file (../rust-core/target/release/libaudit_logic_core.a[640](c877a2978823c39d-sqlite3.o)) was built for newer 'macOS' version (15.5) than being linked (14.0)
+[4/5] Linking AuditService
+Build complete! (7.84s)
++ echo '✅ AuditService 编译完成'
+✅ AuditService 编译完成
++ SIDECAR_DIR=/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin
++ mkdir -p /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin
++ SOURCE_BIN=/Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/.build/release/AuditService
++ '[' '!' -f /Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/.build/release/AuditService ']'
++ echo '📦 正在创建 AuditService.app bundle...'
+📦 正在创建 AuditService.app bundle...
++ APP_BUNDLE=/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService.app
++ rm -rf /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService.app
++ mkdir -p /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService.app/Contents/MacOS
++ mkdir -p /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService.app/Contents/Resources
++ cp /Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/.build/release/AuditService /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService.app/Contents/MacOS/AuditService
++ chmod +x /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService.app/Contents/MacOS/AuditService
++ cat
++ codesign --force --deep --sign - /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService.app
++ echo '✅ AuditService.app bundle 创建成功'
+✅ AuditService.app bundle 创建成功
++ TARGET_BIN=/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService-x86_64-apple-darwin
++ cp /Users/adolf/Desktop/code/clash/mac-monitor-project/audit-service/swift/.build/release/AuditService /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService-x86_64-apple-darwin
++ chmod +x /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/AuditService-x86_64-apple-darwin
++ echo '✅ Sidecar 部署成功'
+✅ Sidecar 部署成功
++ echo ''
+
++ echo '🔌 [3.5/4] 构建 VPN 辅助工具 (Sidecar)...'
+🔌 [3.5/4] 构建 VPN 辅助工具 (Sidecar)...
++ cd /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/swift
++ swiftc -o vpn-helper main.swift VPNManager.swift ProxyManager.swift -framework NetworkExtension -framework Foundation
++ TARGET_VPN_BIN=/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/vpn-helper-x86_64-apple-darwin
++ cp vpn-helper /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/vpn-helper-x86_64-apple-darwin
++ chmod +x /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/vpn-helper-x86_64-apple-darwin
++ echo '✅ VPN Helper 部署成功'
+✅ VPN Helper 部署成功
++ echo ''
+
++ echo '🌐 [3.6/4] 构建 HTTP 代理服务 (Sidecar)...'
+🌐 [3.6/4] 构建 HTTP 代理服务 (Sidecar)...
++ cd /Users/adolf/Desktop/code/clash/mac-monitor-project/traffic-proxy
++ cargo build --release
+warning: unused import: `std::convert::Infallible`
+ --> src/main.rs:1:5
+  |
+1 | use std::convert::Infallible;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::env`
+ --> src/main.rs:4:5
+  |
+4 | use std::env;
+  |     ^^^^^^^^
+
+warning: unused import: `Empty`
+ --> src/main.rs:7:37
+  |
+7 | use http_body_util::{BodyExt, Full, Empty};
+  |                                     ^^^^^
+
+warning: unused import: `std::io::Write`
+ --> src/mitm.rs:9:5
+  |
+9 | use std::io::Write;
+  |     ^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> src/main.rs:146:13
+    |
+146 |         let mut proxy = MITM_PROXY.lock().unwrap();
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/main.rs:241:13
+    |
+241 |         let mut proxy = MITM_PROXY.lock().unwrap();
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: function `set_audit_policy_json` is never used
+   --> src/mitm.rs:207:8
+    |
+207 | pub fn set_audit_policy_json(json: &str) -> Result<()> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `response_body_for_url` is never used
+   --> src/mitm.rs:266:8
+    |
+266 | pub fn response_body_for_url(url: &str, body: &[u8]) -> Option<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `website_rsp_config_array` is never read
+   --> src/mitm.rs:315:5
+    |
+309 | struct AuditPolicy {
+    |        ----------- field in this struct
+...
+315 |     website_rsp_config_array: Vec<ResponseConfig>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `AuditPolicy` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `id` is never read
+   --> src/mitm.rs:322:5
+    |
+319 | struct WhiteDomain {
+    |        ----------- field in this struct
+...
+322 |     id: Option<String>,
+    |     ^^
+    |
+    = note: `WhiteDomain` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `rspbodylength` and `url` are never read
+   --> src/mitm.rs:335:5
+    |
+333 | struct ResponseConfig {
+    |        -------------- fields in this struct
+334 |     #[serde(default)]
+335 |     rspbodylength: usize,
+    |     ^^^^^^^^^^^^^
+336 |     #[serde(default)]
+337 |     url: String,
+    |     ^^^
+    |
+    = note: `ResponseConfig` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: associated function `sync` is never used
+  --> src/clock.rs:24:12
+   |
+ 8 | impl LogicalClock {
+   | ----------------- associated function in this implementation
+...
+24 |     pub fn sync(server_time: i64) {
+   |            ^^^^
+
+warning: `traffic-proxy` (bin "traffic-proxy") generated 12 warnings (run `cargo fix --bin "traffic-proxy" -p traffic-proxy` to apply 6 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.50s
++ PROXY_BIN=/Users/adolf/Desktop/code/clash/mac-monitor-project/traffic-proxy/target/release/traffic-proxy
++ TARGET_PROXY_BIN=/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/traffic-proxy-x86_64-apple-darwin
++ '[' -f /Users/adolf/Desktop/code/clash/mac-monitor-project/traffic-proxy/target/release/traffic-proxy ']'
++ cp /Users/adolf/Desktop/code/clash/mac-monitor-project/traffic-proxy/target/release/traffic-proxy /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/traffic-proxy-x86_64-apple-darwin
++ chmod +x /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/bin/traffic-proxy-x86_64-apple-darwin
++ echo '✅ Traffic Proxy 部署成功'
+✅ Traffic Proxy 部署成功
++ echo ''
+
++ echo '🖥️  [4/4] 构建 Tauri GUI 应用...'
+🖥️  [4/4] 构建 Tauri GUI 应用...
++ cd /Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app
++ '[' '!' -d node_modules ']'
++ echo '🚀 开始 Tauri 构建...'
+🚀 开始 Tauri 构建...
++ echo '🚀 开始 Tauri 构建...'
+🚀 开始 Tauri 构建...
++ npm run tauri build
++ APP_BUNDLE_PATH='/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/target/release/bundle/macos/Mac Monitor.app'
++ PLUGINS_DIR='/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/target/release/bundle/macos/Mac Monitor.app/Contents/PlugIns'
++ echo '🧩 正在嵌入 Network Extension...'
+🧩 正在嵌入 Network Extension...
++ mkdir -p '/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/target/release/bundle/macos/Mac Monitor.app/Contents/PlugIns'
++ cp -r /Users/adolf/Desktop/code/clash/mac-monitor-project/mitmproxy_rs/mitmproxy-macos/redirector/build/Release/network-extension.appex '/Users/adolf/Desktop/code/clash/mac-monitor-project/gui-app/src-tauri/target/release/bundle/macos/Mac Monitor.app/Contents/PlugIns/'
++ echo ''
+
++ echo '💿 DMG 安装包位置: output/Mac Monitor.dmg'
+💿 DMG 安装包位置: output/Mac Monitor.dmg
++ echo '📀 正在生成 DMG (修复图标重叠)...'
+📀 正在生成 DMG (修复图标重叠)...
++ command -v npm
++ npx -y appdmg /Users/adolf/Desktop/code/clash/mac-monitor-project/dmg-config.json '/Users/adolf/Desktop/code/clash/mac-monitor-project/output/Mac Monitor.dmg'
+[ 1/21] Looking for target...                [FAIL]
+
+Error: Target already exists
++ echo '⚠️ appdmg 生成失败'
+⚠️ appdmg 生成失败
++ mkdir -p /Users/adolf/Desktop/code/clash/mac-monitor-project/output
++ echo '📦 已发布到 output/ 目录下'
+📦 已发布到 output/ 目录下
++ echo '⚠️  注意: 由于是无签名/Ad-hoc构建，Network Extension 可能需要关闭 SIP 或手动签名才能加载。'
+⚠️  注意: 由于是无签名/Ad-hoc构建，Network Extension 可能需要关闭 SIP 或手动签名才能加载。
++ echo '🎉 ========================================'
+🎉 ========================================
