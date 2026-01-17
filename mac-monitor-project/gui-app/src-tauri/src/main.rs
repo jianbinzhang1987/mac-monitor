@@ -414,6 +414,37 @@ fn run_vpn_helper_auth(arg: &str, handle: tauri::AppHandle) -> Result<String, St
     }
 }
 
+// Combined function to run both monitoring and proxy in a single sudo prompt
+fn run_vpn_helper_auth_combined(handle: tauri::AppHandle) -> Result<String, String> {
+    let sidecar_path = std::env::current_exe()
+        .map_err(|e| e.to_string())?
+        .parent()
+        .unwrap()
+        .join("vpn-helper");
+
+    let helper_path = sidecar_path.to_string_lossy().to_string();
+    
+    // Run both commands in a single script with one sudo prompt
+    let script = format!(
+        "do shell script \"'{}' --enable-monitoring && '{}' --enable-proxy\" with administrator privileges",
+        helper_path, helper_path
+    );
+
+    println!("🔑 Requesting privilege for combined operations...");
+
+    let output = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
 #[tauri::command]
 async fn enable_proxy(app_handle: tauri::AppHandle) -> Result<String, String> {
     // Invoke vpn-helper --enable-proxy with admin privs
@@ -500,26 +531,15 @@ fn main() {
             // Enable AutoSart (OS Login Item)
             let _ = app.autolaunch().enable();
 
-            // Auto-start Monitoring on App Launch
+            // Auto-start Monitoring and Proxy on App Launch (combined to single sudo prompt)
             tauri::async_runtime::spawn(async move {
                 time::sleep(Duration::from_secs(1)).await;
-                println!("🚀 Auto-enabling Monitoring Service...");
-                match enable_monitoring(handle.clone()).await {
-                    Ok(out) => println!("✅ Monitoring Auto-Enabled: {}", out),
-                    Err(e) => eprintln!("❌ Failed to Auto-Enable Monitoring: {}", e),
-                }
-            });
-
-            let handle = app.handle().clone();
-            // Auto-start Proxy on App Launch (User Request)
-            // This will prompt for password if not already authorized recently
-            tauri::async_runtime::spawn(async move {
-                // Delay slightly to let UI show up first
-                time::sleep(Duration::from_secs(3)).await;
-                println!("🚀 Auto-enabling HTTP Proxy...");
-                match enable_proxy(handle.clone()).await {
-                    Ok(out) => println!("✅ Proxy Auto-Enabled: {}", out),
-                    Err(e) => eprintln!("❌ Failed to Auto-Enable Proxy: {}", e),
+                println!("🚀 Auto-enabling Monitoring Service and HTTP Proxy...");
+                
+                // Combine both operations into a single sudo call
+                match run_vpn_helper_auth_combined(handle.clone()) {
+                    Ok(out) => println!("✅ Services Auto-Enabled: {}", out),
+                    Err(e) => eprintln!("❌ Failed to Auto-Enable Services: {}", e),
                 }
             });
 

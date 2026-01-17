@@ -231,6 +231,8 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 	<string>Mac Monitor 需要录屏权限来监控终端活动、捕获屏幕内容并进行 OCR 文字识别，以实现安全审计功能。</string>
 	<key>NSSystemAdministrationUsageDescription</key>
 	<string>Mac Monitor 需要系统管理权限来监控进程活动和网络连接。</string>
+	<key>LSUIElement</key>
+	<true/>
 </dict>
 </plist>
 EOF

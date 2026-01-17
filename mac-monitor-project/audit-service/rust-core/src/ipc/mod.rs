@@ -82,29 +82,36 @@ impl IpcServer {
     }
 
     fn handle_client(&self, mut stream: LocalSocketStream) {
+        println!("DEBUG: handle_client start");
         let mut buffer = [0u8; 65536];
         match stream.read(&mut buffer) {
             Ok(n) if n > 0 => {
+                println!("DEBUG: Read {} bytes", n);
                 let cmd_str = String::from_utf8_lossy(&buffer[..n]);
                 println!("Received IPC command: {}", cmd_str);
 
                 let response = match serde_json::from_str::<IpcCommand>(&cmd_str) {
-                    Ok(cmd) => self.process_command(cmd),
+                    Ok(cmd) => {
+                        println!("DEBUG: Command parsed, processing...");
+                        self.process_command(cmd)
+                    },
                     Err(e) => IpcResponse {
                         status: "error".to_string(),
                         message: format!("Invalid JSON: {}", e),
                         payload: None,
                     },
                 };
-
+                
+                println!("DEBUG: Sending response...");
                 let response_json = serde_json::to_string(&response).unwrap_or_else(|_| "{\"status\":\"error\"}".to_string());
                 let _ = stream.write_all(response_json.as_bytes());
                 let _ = stream.flush();
+                println!("DEBUG: Response sent.");
             }
             Ok(_) => println!("IPC client closed connection or sent empty data"),
             Err(e) => eprintln!("Failed to read from IPC stream: {}", e),
         }
-        // stream is dropped here, closing the connection which allows the GUI's read_to_string to finish.
+        println!("DEBUG: handle_client end");
     }
 
     fn process_command(&self, cmd: IpcCommand) -> IpcResponse {

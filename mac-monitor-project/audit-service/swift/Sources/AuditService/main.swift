@@ -2,6 +2,15 @@ import Foundation
 
 print("🚀 Audit Service Launcher Initializing...")
 
+// CRITICAL: Ignore SIGPIPE to prevent silent process termination
+// when writing to closed sockets (e.g., IPC client disconnects)
+signal(SIGPIPE, SIG_IGN)
+
+// Debugging: catch unexpected exit
+atexit {
+    print("❌ Process is exiting (atexit triggered)!")
+}
+
 // FFI functions are defined in FFI.swift
 
 // Start non-ES services only (without EndpointSecurity)
@@ -26,7 +35,6 @@ func startAuditServices() {
 
     print("✅ Audit Services started")
     print("📍 Socket location: /tmp/mac_monitor_audit.sock")
-    print("⏳ Entering main run loop...")
 }
 
 // Set up signal handling for graceful shutdown
@@ -42,6 +50,8 @@ signal(SIGTERM) { _ in
 
 startAuditServices()
 
-// Prevent the process from exiting
-// Use a more robust way to keep the CLI tool alive
-RunLoop.main.run()
+print("⏳ Entering main dispatch loop (dispatchMain)...")
+
+// Use dispatchMain() - this is the most robust way to keep a CLI daemon alive
+// It never returns and processes all dispatch queues (including Tokio's)
+dispatchMain()
