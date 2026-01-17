@@ -1,30 +1,38 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import {
-  PieChartOutlined,
-  DesktopOutlined,
-  UserOutlined,
-  FileOutlined,
-  SafetyCertificateOutlined,
-  CameraOutlined,
   GlobalOutlined,
   SyncOutlined,
   InfoCircleOutlined,
   LogoutOutlined,
-  CopyOutlined,
+  SearchOutlined
 } from '@ant-design/icons-vue';
 import { invoke } from '@tauri-apps/api/core';
 import { message } from 'ant-design-vue';
+import { useNavigation } from '../composables/useNavigation';
+
+// Internal Components
 import Overview from './Overview.vue';
 import TrafficAudit from './TrafficAudit.vue';
 import ProcessProtection from './ProcessProtection.vue';
 import FileSecurity from './FileSecurity.vue';
 import ScreenshotRecord from './ScreenshotRecord.vue';
 import ClipboardAudit from './ClipboardAudit.vue';
+import DeviceManagement from './DeviceManagement.vue';
 
+const { activeView } = useNavigation();
 
-const collapsed = ref<boolean>(false);
-const selectedKeys = ref<string[]>(['1']);
+const viewNames: Record<string, string> = {
+  'overview': '系统状态概览',
+  'traffic': '网络上网审计',
+  'process': '系统进程防护',
+  'file': '文件安全监控',
+  'screen': '界面行为审计',
+  'clipboard': '剪贴板审计',
+  'sync': '终端设备管理'
+};
+
+const currentViewName = computed(() => viewNames[activeView.value] || activeView.value);
 
 type PopNode = { id: string; name: string; latency: number };
 const popNodes = ref<PopNode[]>([]);
@@ -51,7 +59,7 @@ const handlePopChange = async (value: string) => {
   try {
     await invoke('switch_pop_node', { nodeId: value });
     currentPop.value = value;
-    message.success('已连接至新节点');
+    message.success('已切换至加密出口：' + value);
   } catch (err) {
     message.error('切换失败');
   } finally {
@@ -74,359 +82,116 @@ const handleCheckUpdate = async () => {
 </script>
 
 <template>
-  <div class="premium-dashboard">
-    <a-layout style="min-height: 100vh; background: transparent">
-      <!-- 侧边栏 -->
-      <a-layout-sider v-model:collapsed="collapsed" collapsible class="glass-sider">
-        <div class="logo-area">
-          <div class="logo-icon">M</div>
-          <span v-if="!collapsed" class="logo-text">Mac Monitor</span>
+  <div class="flex flex-col h-full w-full">
+    <!-- Sub-Header / ToolBar -->
+    <header
+      class="h-14 border-b border-macos-border flex items-center justify-between px-6 shrink-0 bg-white/30 dark:bg-black/10 backdrop-blur-md sticky top-0 z-40">
+      <div class="flex items-center gap-4">
+        <h2 class="text-lg font-bold tracking-tight text-macos-text">
+          {{ currentViewName }}
+        </h2>
+
+        <div v-if="systemStatus.serviceRunning"
+          class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 text-[10px] font-bold text-green-600 dark:text-green-400 border border-green-500/20 uppercase tracking-wide">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+          服务运行中
         </div>
-        <a-menu v-model:selectedKeys="selectedKeys" mode="inline" class="premium-menu">
-          <a-menu-item key="1">
-            <pie-chart-outlined />
-            <span>系统概览</span>
-          </a-menu-item>
-          <a-menu-item key="2">
-            <desktop-outlined />
-            <span>网络审计</span>
-          </a-menu-item>
-          <a-sub-menu key="sub1">
-            <template #title>
-              <span>
-                <user-outlined />
-                <span>行为日志</span>
-              </span>
-            </template>
-            <a-menu-item key="3"><safety-certificate-outlined /> 进程防护</a-menu-item>
-            <a-menu-item key="4"><file-outlined /> 文件安全</a-menu-item>
-            <a-menu-item key="5"><camera-outlined /> 截屏记录</a-menu-item>
-            <a-menu-item key="7"><copy-outlined /> 剪贴板审计</a-menu-item>
-          </a-sub-menu>
-          <a-menu-item key="6">
-            <sync-outlined />
-            <span>同步状态</span>
-          </a-menu-item>
-        </a-menu>
-      </a-layout-sider>
+      </div>
 
-      <a-layout class="main-layout">
-        <!-- 顶部状态栏 -->
-        <a-layout-header class="glass-header">
-          <div class="header-left">
-            <div class="status-indicator">
-              <span class="dot pulse"></span>
-              <span class="status-text">审计引擎运行中 (抢占模式)</span>
-            </div>
-          </div>
-          <div class="header-right">
-            <GlobalOutlined class="pop-icon" />
-            <a-select v-model:value="currentPop" class="pop-select" :loading="loadingPop" @change="handlePopChange"
-              :bordered="false">
-              <a-select-option v-for="node in popNodes" :key="node.id" :value="node.id">
-                {{ node.name }} ({{ node.latency }}ms)
-              </a-select-option>
-            </a-select>
-            <a-divider type="vertical" />
-            <a-tooltip title="版本信息">
-              <info-circle-outlined class="header-action-icon" @click="handleCheckUpdate" />
-            </a-tooltip>
-            <a-button type="text" class="logout-btn">
-              <logout-outlined />
-            </a-button>
-          </div>
-        </a-layout-header>
+      <div class="flex items-center gap-3">
+        <!-- Search Bar Shorthand -->
+        <div class="relative group hidden sm:block">
+          <SearchOutlined class="absolute left-2.5 top-1/2 -translate-y-1/2 text-macos-text-secondary w-3 h-3" />
+          <input type="text" placeholder="搜索审计日志..."
+            class="h-7 w-32 focus:w-48 transition-all duration-300 bg-black/5 dark:bg-white/10 border-none rounded-md pl-8 pr-3 text-xs focus:ring-1 focus:ring-macos-accent outline-none" />
+        </div>
 
-        <!-- 内容区 -->
-        <a-layout-content class="content-wrapper">
-          <Overview v-if="selectedKeys[0] === '1'" />
-          <TrafficAudit v-else-if="selectedKeys[0] === '2'" />
-          <ProcessProtection v-else-if="selectedKeys[0] === '3'" />
-          <FileSecurity v-else-if="selectedKeys[0] === '4'" />
-          <ScreenshotRecord v-else-if="selectedKeys[0] === '5'" />
-          <ClipboardAudit v-else-if="selectedKeys[0] === '7'" />
-          <div v-else class="coming-soon">
-            <a-empty description="功能模块开发中" />
+        <a-divider type="vertical" />
+
+        <div class="flex items-center gap-1 bg-black/5 dark:bg-white/10 rounded-md px-2 py-1 h-7">
+          <GlobalOutlined class="text-[10px] text-macos-text-secondary" />
+          <a-select v-model:value="currentPop" class="pop-select" :loading="loadingPop" @change="handlePopChange"
+            :bordered="false" size="small">
+            <a-select-option v-for="node in popNodes" :key="node.id" :value="node.id">
+              {{ node.name }}
+            </a-select-option>
+          </a-select>
+        </div>
+
+        <button @click="handleCheckUpdate"
+          class="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-macos-text-secondary transition-colors">
+          <InfoCircleOutlined class="text-sm" />
+        </button>
+
+        <button class="p-1.5 rounded-md hover:bg-red-500/10 text-red-500 transition-colors">
+          <LogoutOutlined class="text-sm" />
+        </button>
+      </div>
+    </header>
+
+    <!-- Main View Content -->
+    <div class="flex-1 overflow-auto">
+      <transition name="fade" mode="out-in">
+        <div :key="activeView" class="p-6">
+          <Overview v-if="activeView === 'overview'" />
+          <TrafficAudit v-else-if="activeView === 'traffic'" />
+          <ProcessProtection v-else-if="activeView === 'process'" />
+          <FileSecurity v-else-if="activeView === 'file'" />
+          <ScreenshotRecord v-else-if="activeView === 'screen'" />
+          <ClipboardAudit v-else-if="activeView === 'clipboard'" />
+          <DeviceManagement v-else-if="activeView === 'sync'" />
+          <div v-else class="flex flex-col items-center justify-center p-12 text-macos-text-secondary opacity-50">
+            <SyncOutlined class="text-4xl mb-4 animate-spin" />
+            <p>模块加载中...</p>
           </div>
-        </a-layout-content>
-      </a-layout>
-    </a-layout>
+        </div>
+      </transition>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.premium-dashboard {
-  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-  color: #fff;
-  font-family: 'Inter', -apple-system, sans-serif;
-}
-
-/* 侧边栏样式 */
-.glass-sider {
-  background: rgba(255, 255, 255, 0.03) !important;
-  backdrop-filter: blur(10px);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.logo-area {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  gap: 12px;
-}
-
-.logo-icon {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(to bottom right, #3b82f6, #8b5cf6);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-}
-
-.logo-text {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-}
-
-.premium-menu {
-  background: transparent !important;
-  border-right: none !important;
-}
-
-:deep(.ant-menu-item),
-:deep(.ant-menu-submenu-title) {
-  color: #94a3b8 !important;
-  margin: 4px 8px !important;
-  border-radius: 8px !important;
-}
-
-:deep(.ant-menu-item-selected) {
-  background: rgba(59, 130, 246, 0.1) !important;
-  color: #3b82f6 !important;
-}
-
-/* Header 样式 */
-.glass-header {
-  background: rgba(15, 23, 42, 0.5) !important;
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  height: 64px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 24px;
-}
-
-.status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 6px 12px;
-  border-radius: 20px;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-}
-
-.pulse {
-  box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  }
-
-  70% {
-    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-  }
-}
-
-.status-text {
-  font-size: 13px;
-  color: #88fa88;
-  font-weight: 500;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.pop-icon {
-  font-size: 16px;
-  color: #94a3b8;
-}
-
 .pop-select {
-  width: 150px;
-  color: #fff !important;
+  width: 90px;
 }
 
-:deep(.ant-select-selector) {
-  color: #fff !important;
+:deep(.ant-select-selection-item) {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--macos-text) !important;
 }
 
-.header-action-icon {
-  font-size: 18px;
-  color: #94a3b8;
-  cursor: pointer;
-  transition: color 0.3s;
+/* Page Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.header-action-icon:hover {
-  color: #fff;
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
 }
 
-.logout-btn {
-  color: #f43f5e;
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
-/* 内容区样式 */
-.content-wrapper {
-  padding: 24px 32px;
+/* Custom Scrollbar for macOS look */
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-.page-header {
-  margin-bottom: 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.page-title {
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0;
-  color: #f8fafc;
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
-.date-time {
-  color: #64748b;
-  font-size: 13px;
-}
-
-.card-glass {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s, background 0.3s;
-}
-
-.card-glass:hover {
-  background: rgba(255, 255, 255, 0.05);
-  transform: translateY(-2px);
-}
-
-.stat-card {
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.stat-icon-wrap {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-}
-
-.stat-icon-wrap.blue {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-}
-
-.stat-icon-wrap.red {
-  background: rgba(244, 63, 94, 0.1);
-  color: #f43f5e;
-}
-
-.stat-icon-wrap.green {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-}
-
-.stat-icon-wrap.orange {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-}
-
-.stat-label {
-  font-size: 13px;
-  color: #94a3b8;
-}
-
-.stat-value {
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.stat-value .unit {
-  font-size: 12px;
-  font-weight: normal;
-  color: #64748b;
-  margin-left: 2px;
-}
-
-.main-card {
-  padding: 24px;
-  min-height: 400px;
-}
-
-.mt-24 {
-  margin-top: 24px;
-}
-
-:deep(.ant-tabs-tab) {
-  color: #94a3b8 !important;
-}
-
-:deep(.ant-tabs-tab-active) {
-  color: #3b82f6 !important;
-}
-
-.chart-placeholder {
-  height: 300px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #475569;
-}
-
-.mock-line {
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(to right, transparent, #3b82f6, transparent);
-  margin-bottom: 20px;
-}
-
-.coming-soon {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
 }
 </style>

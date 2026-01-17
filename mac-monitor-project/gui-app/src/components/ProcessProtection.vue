@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
+import {
+  ShieldCheck,
+  ShieldAlert,
+  RefreshCcw,
+  Info,
+  Cpu,
+  Activity,
+  Zap
+} from 'lucide-vue-next';
 
 interface ProcessLog {
   id: string;
@@ -16,150 +25,172 @@ const loading = ref(false);
 const processLogs = ref<ProcessLog[]>([]);
 
 const columns = [
-  { title: '时间', dataIndex: 'timestamp', key: 'timestamp', width: 180 },
-  { title: '进程名称', dataIndex: 'process_name', key: 'process_name', width: 180 },
-  { title: '操作类型', dataIndex: 'action', key: 'action', width: 120 },
-  { title: '目标对象', dataIndex: 'target', key: 'target', ellipsis: true },
-  { title: '处理结果', dataIndex: 'result', key: 'result', width: 100 },
-  { title: '原因', dataIndex: 'reason', key: 'reason', ellipsis: true },
+  { title: '触发时间', dataIndex: 'timestamp', key: 'timestamp', width: 120 },
+  { title: '来源进程', dataIndex: 'process_name', key: 'process_name', width: 140 },
+  { title: '操作行为', dataIndex: 'action', key: 'action', width: 100 },
+  { title: '拦截目标', dataIndex: 'target', key: 'target', ellipsis: true },
+  { title: '处置结果', dataIndex: 'result', key: 'result', width: 90 },
 ];
 
 const loadProcessLogs = async () => {
   loading.value = true;
   try {
-    // Mock 数据
+    // Mock Data
     processLogs.value = Array.from({ length: 15 }, (_, i) => ({
       id: `proc-${i}`,
-      timestamp: new Date(Date.now() - i * 120000).toLocaleString('zh-CN'),
+      timestamp: new Date(Date.now() - i * 120000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       process_name: ['clash-verge', 'v2ray', 'shadowsocks', 'surge', 'Terminal'][i % 5],
       action: ['SIGNAL', 'KILL', 'TERMINATE'][i % 3],
       target: 'AuditService',
       result: i % 4 === 0 ? 'blocked' : 'allowed',
-      reason: i % 4 === 0 ? '未授权的进程终止尝试' : '正常系统操作',
+      reason: i % 4 === 0 ? 'Unauthorized termination attempt' : 'Normal system operation',
     }));
   } catch (err) {
-    message.error('加载进程日志失败');
-    console.error(err);
+    message.error('加载防护日志失败');
   } finally {
     loading.value = false;
   }
 };
 
-onMounted(() => {
-  loadProcessLogs();
-});
-
-const getResultTag = (result: string) => {
-  return result === 'blocked' 
-    ? { color: 'error', text: '已拦截' } 
-    : { color: 'success', text: '已放行' };
-};
+onMounted(loadProcessLogs);
 </script>
 
 <template>
-  <div class="process-protection-page">
-    <div class="page-header">
-      <h3 class="page-title">进程防护日志</h3>
-      <div class="actions">
-        <a-button type="primary" @click="loadProcessLogs" :loading="loading">
-          刷新
-        </a-button>
+  <div class="h-full flex flex-col space-y-6 animate-in fade-in duration-500">
+    <!-- Header banner -->
+    <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex items-start gap-4 mx-1">
+      <div class="bg-blue-500/20 p-2 rounded-lg text-blue-600 dark:text-blue-400">
+        <ShieldCheck class="w-5 h-5" />
+      </div>
+      <div class="flex-1">
+        <h4 class="text-sm font-bold text-macos-text">核心组件进程防护已开启</h4>
+        <p class="text-xs text-macos-text-secondary opacity-80 leading-relaxed">
+          系统正在实时监控关键服务的退出与终止尝试。任何未经授权的非法进程终止信号都将被自动拦截并审计。
+        </p>
+      </div>
+      <button @click="loadProcessLogs"
+        class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors shrink-0"
+        :class="{ 'animate-spin': loading }">
+        <RefreshCcw class="w-4 h-4 text-macos-text-secondary" />
+      </button>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 px-1">
+      <div
+        class="bg-white/40 dark:bg-white/5 border border-macos-border rounded-xl p-4 shadow-sm flex items-center gap-3">
+        <div class="p-2 rounded-lg bg-purple-500/10 text-purple-600">
+          <Cpu class="w-4 h-4" />
+        </div>
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-wider text-macos-text-secondary opacity-60">重点监控中
+          </div>
+          <div class="text-sm font-bold">128 个存活进程</div>
+        </div>
+      </div>
+      <div
+        class="bg-white/40 dark:bg-white/5 border border-macos-border rounded-xl p-4 shadow-sm flex items-center gap-3">
+        <div class="p-2 rounded-lg bg-orange-500/10 text-orange-600">
+          <Activity class="w-4 h-4" />
+        </div>
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-wider text-macos-text-secondary opacity-60">今日捕获信号
+          </div>
+          <div class="text-sm font-bold">45 次系统事件</div>
+        </div>
+      </div>
+      <div
+        class="bg-white/40 dark:bg-white/5 border border-macos-border rounded-xl p-4 shadow-sm flex items-center gap-3">
+        <div class="p-2 rounded-lg bg-red-500/10 text-red-600">
+          <Zap class="w-4 h-4" />
+        </div>
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-wider text-macos-text-secondary opacity-60">已拦截风险
+          </div>
+          <div class="text-sm font-bold">3 次异常终止尝试</div>
+        </div>
       </div>
     </div>
 
-    <a-alert
-      message="进程防护已启用"
-      description="系统正在实时监控并拦截未授权的进程终止行为，保护关键服务不被恶意终止。"
-      type="success"
-      show-icon
-      closable
-      style="margin-bottom: 16px"
-    />
+    <!-- Log Table -->
+    <div
+      class="flex-1 overflow-hidden bg-white/40 dark:bg-white/5 border border-macos-border rounded-xl shadow-sm flex flex-col mx-1">
+      <div class="px-4 py-3 border-b border-macos-border flex items-center justify-between">
+        <h4 class="text-xs font-bold uppercase tracking-widest text-macos-text-secondary opacity-50">底层内核事件流</h4>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          <span class="text-[10px] font-bold text-macos-text-secondary uppercase">监控运行中</span>
+        </div>
+      </div>
 
-    <div class="table-container card-glass">
-      <a-table
-        :columns="columns"
-        :data-source="processLogs"
-        :loading="loading"
-        :pagination="{ pageSize: 10 }"
-        row-key="id"
-        size="small"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'process_name'">
-            <a-tag color="purple">{{ record.process_name }}</a-tag>
+      <div class="flex-1 overflow-auto">
+        <a-table :columns="columns" :data-source="processLogs" :loading="loading" :pagination="false" row-key="id"
+          size="small" class="macos-table">
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'process_name'">
+              <div class="flex items-center gap-2">
+                <div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                <span class="text-xs font-semibold text-macos-text">{{ record.process_name }}</span>
+              </div>
+            </template>
+            <template v-if="column.key === 'action'">
+              <span
+                class="text-[10px] font-mono font-bold text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded bg-orange-500/10">
+                {{ record.action }}
+              </span>
+            </template>
+            <template v-if="column.key === 'result'">
+              <div class="flex items-center gap-1.5">
+                <component :is="record.result === 'allowed' ? ShieldCheck : ShieldAlert" class="w-3.5 h-3.5"
+                  :class="record.result === 'allowed' ? 'text-green-500' : 'text-red-500'" />
+                <span class="text-[10px] font-bold uppercase tracking-tight"
+                  :class="record.result === 'allowed' ? 'text-green-600' : 'text-red-600'">
+                  {{ record.result === 'allowed' ? '已放行' : '已拦截' }}
+                </span>
+              </div>
+            </template>
+            <template v-if="column.key === 'timestamp'">
+              <span class="text-[11px] text-macos-text-secondary font-medium">{{ record.timestamp }}</span>
+            </template>
           </template>
-          <template v-if="column.key === 'action'">
-            <a-tag color="orange">{{ record.action }}</a-tag>
-          </template>
-          <template v-if="column.key === 'result'">
-            <a-tag :color="getResultTag(record.result).color">
-              {{ getResultTag(record.result).text }}
-            </a-tag>
-          </template>
-        </template>
-      </a-table>
+        </a-table>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.process-protection-page {
-  padding: 24px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #f8fafc;
-  margin: 0;
-}
-
-.actions {
-  display: flex;
-  gap: 12px;
-}
-
-.table-container {
-  padding: 16px;
-}
-
-.card-glass {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-}
-
-:deep(.ant-table) {
+.macos-table :deep(.ant-table) {
   background: transparent !important;
-  color: #e2e8f0 !important;
 }
 
-:deep(.ant-table-thead > tr > th) {
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: #94a3b8 !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+.macos-table :deep(.ant-table-thead > tr > th) {
+  background: transparent !important;
+  color: var(--macos-text-secondary) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-bottom: 1px solid var(--macos-border) !important;
 }
 
-:deep(.ant-table-tbody > tr > td) {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-  color: #cbd5e1 !important;
+.macos-table :deep(.ant-table-tbody > tr > td) {
+  border-bottom: 1px solid var(--macos-border) !important;
 }
 
-:deep(.ant-table-tbody > tr:hover > td) {
-  background: rgba(59, 130, 246, 0.05) !important;
+.animate-in {
+  animation: fadeIn 0.5s ease-out;
 }
 
-:deep(.ant-alert) {
-  background: rgba(16, 185, 129, 0.1) !important;
-  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

@@ -2,6 +2,16 @@
 import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { invoke } from '@tauri-apps/api/core';
+import {
+  Clipboard,
+  Search,
+  RefreshCcw,
+  Link2,
+  Type,
+  AlertCircle,
+  ShieldCheck,
+  Globe
+} from 'lucide-vue-next';
 
 interface ClipboardLog {
   id: number;
@@ -11,22 +21,17 @@ interface ClipboardLog {
   content: string;
   content_type: string;
   risk_level: number;
-  cpe_id: string;
-  host_id: string;
-  mac: string;
-  ip: string;
 }
 
 const loading = ref(false);
 const clipboardLogs = ref<ClipboardLog[]>([]);
 
 const columns = [
-  { title: '时间', dataIndex: 'op_time', key: 'op_time', width: 180 },
-  { title: '应用名称', dataIndex: 'app_name', key: 'app_name', width: 150 },
-  { title: 'Bundle ID', dataIndex: 'bundle_id', key: 'bundle_id', ellipsis: true },
-  { title: '内容类型', dataIndex: 'content_type', key: 'content_type', width: 120 },
-  { title: '内容预览', dataIndex: 'content', key: 'content', ellipsis: true },
-  { title: '风险等级', dataIndex: 'risk_level', key: 'risk_level', width: 100 },
+  { title: '记录时间', dataIndex: 'op_time', key: 'op_time', width: 120 },
+  { title: '来源应用', dataIndex: 'app_name', key: 'app_name', width: 140 },
+  { title: '数据类型', dataIndex: 'content_type', key: 'content_type', width: 100 },
+  { title: '剪贴板预览', dataIndex: 'content', key: 'content', ellipsis: true },
+  { title: '风险等级', dataIndex: 'risk_level', key: 'risk_level', width: 80 },
 ];
 
 const loadClipboardLogs = async () => {
@@ -35,121 +40,137 @@ const loadClipboardLogs = async () => {
     const res = await invoke('get_clipboard_logs') as ClipboardLog[];
     clipboardLogs.value = res;
   } catch (err) {
-    message.error('加载剪贴板日志失败');
-    console.error(err);
+    message.error('剪贴板监控流连接中断');
   } finally {
     loading.value = false;
   }
 };
 
-onMounted(() => {
-  loadClipboardLogs();
-});
+onMounted(loadClipboardLogs);
 </script>
 
 <template>
-  <div class="clipboard-audit-page">
-    <div class="page-header">
-      <h3 class="page-title">浏览器剪贴板审计</h3>
-      <div class="actions">
-        <a-button type="primary" @click="loadClipboardLogs" :loading="loading">
-          刷新
-        </a-button>
+  <div class="h-full flex flex-col space-y-6 animate-in fade-in duration-500">
+    <!-- Header banner -->
+    <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-4 mx-1">
+      <div class="bg-amber-500/20 p-2 rounded-lg text-amber-600 dark:text-amber-400">
+        <Clipboard class="w-5 h-5" />
+      </div>
+      <div class="flex-1">
+        <h4 class="text-sm font-bold text-macos-text">浏览器剪贴板行为审计已激活</h4>
+        <p class="text-xs text-macos-text-secondary opacity-80 leading-relaxed">
+          正在监控终端侧浏览器级别的剪贴板写入行为。重点审计 Safari, Chrome, Arc 等主流办公浏览器中涉及敏感数据的跨应用拷贝。
+        </p>
+      </div>
+      <button @click="loadClipboardLogs"
+        class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors shrink-0"
+        :class="{ 'animate-spin': loading }">
+        <RefreshCcw class="w-4 h-4 text-macos-text-secondary" />
+      </button>
+    </div>
+
+    <!-- Quick Stats & Filters -->
+    <div class="flex items-center gap-4 mx-1">
+      <div class="relative flex-1">
+        <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-macos-text-secondary opacity-50" />
+        <input type="text" placeholder="过滤关键字、URL 或 敏感词..."
+          class="h-10 w-full bg-white/40 dark:bg-white/5 border border-macos-border rounded-xl pl-9 pr-3 text-xs outline-none focus:ring-1 focus:ring-macos-accent transition-all" />
       </div>
     </div>
 
-    <a-alert
-      message="剪贴板监控已激活"
-      description="仅监控白名单浏览器的剪贴板写入行为 (Chrome, Safari, Firefox, Edge, Arc 等)"
-      type="info"
-      show-icon
-      style="margin-bottom: 16px"
-    />
+    <!-- Log Table -->
+    <div
+      class="flex-1 overflow-hidden bg-white/40 dark:bg-white/5 border border-macos-border rounded-xl shadow-sm flex flex-col mx-1">
+      <div class="flex-1 overflow-auto">
+        <a-table :columns="columns" :data-source="clipboardLogs" :loading="loading" :pagination="false" row-key="id"
+          size="small" class="macos-table">
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'app_name'">
+              <div class="flex items-center gap-2">
+                <div class="w-5 h-5 rounded bg-black/5 dark:bg-white/10 flex items-center justify-center">
+                  <Globe v-if="record.app_name.includes('Safari') || record.app_name.includes('Chrome')"
+                    class="w-3 h-3 text-macos-accent" />
+                  <Type v-else class="w-3 h-3 text-macos-text-secondary" />
+                </div>
+                <span class="text-xs font-semibold text-macos-text">{{ record.app_name }}</span>
+              </div>
+            </template>
 
-    <div class="table-container card-glass">
-      <a-table
-        :columns="columns"
-        :data-source="clipboardLogs"
-        :loading="loading"
-        :pagination="{ pageSize: 10 }"
-        row-key="id"
-        size="small"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'content_type'">
-            <a-tag :color="record.content_type === 'text/plain' ? 'blue' : (record.content_type === 'text/url' ? 'green' : 'orange')">
-              {{ record.content_type }}
-            </a-tag>
+            <template v-if="column.key === 'content_type'">
+              <div class="flex items-center gap-1.5 opacity-70">
+                <component :is="record.content_type.includes('url') ? Link2 : Type" class="w-3 h-3" />
+                <span class="text-[10px] font-bold uppercase tracking-tight">{{ record.content_type.split('/')[1] ||
+                  '文本' }}</span>
+              </div>
+            </template>
+
+            <template v-if="column.key === 'risk_level'">
+              <div class="flex items-center gap-1.5">
+                <component :is="record.risk_level > 1 ? AlertCircle : ShieldCheck" class="w-3.5 h-3.5"
+                  :class="record.risk_level > 1 ? 'text-red-500' : 'text-green-500'" />
+                <span class="text-[10px] font-bold uppercase tracking-tight"
+                  :class="record.risk_level > 1 ? 'text-red-600' : 'text-green-600'">
+                  {{ record.risk_level > 1 ? '高风险' : '安全' }}
+                </span>
+              </div>
+            </template>
+
+            <template v-if="column.key === 'content'">
+              <span
+                class="text-xs font-medium text-macos-text opacity-90 select-all underline decoration-macos-accent/20 underline-offset-2">{{
+                  record.content }}</span>
+            </template>
+
+            <template v-if="column.key === 'op_time'">
+              <span class="text-[11px] text-macos-text-secondary font-medium">{{ record.op_time }}</span>
+            </template>
           </template>
-          <template v-if="column.key === 'risk_level'">
-            <a-tag :color="record.risk_level > 1 ? 'error' : 'warning'">
-              {{ record.risk_level > 1 ? '高风险' : '信息' }}
-            </a-tag>
-          </template>
-        </template>
-      </a-table>
+        </a-table>
+      </div>
+
+      <!-- Table Footer -->
+      <div class="px-4 h-9 border-t border-macos-border bg-black/5 dark:bg-white/5 flex items-center shrink-0">
+        <span
+          class="text-[9px] font-bold uppercase tracking-[0.2em] text-macos-text-secondary opacity-40">已开启隐私数据脱敏技术</span>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.clipboard-audit-page {
-  padding: 24px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #f8fafc;
-  margin: 0;
-}
-
-.actions {
-  display: flex;
-  gap: 12px;
-}
-
-.table-container {
-  padding: 16px;
-}
-
-.card-glass {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-}
-
-:deep(.ant-table) {
+.macos-table :deep(.ant-table) {
   background: transparent !important;
-  color: #e2e8f0 !important;
 }
 
-:deep(.ant-table-thead > tr > th) {
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: #94a3b8 !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+.macos-table :deep(.ant-table-thead > tr > th) {
+  background: transparent !important;
+  color: var(--macos-text-secondary) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-bottom: 1px solid var(--macos-border) !important;
+  padding-top: 12px !important;
 }
 
-:deep(.ant-table-tbody > tr > td) {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-  color: #cbd5e1 !important;
+.macos-table :deep(.ant-table-tbody > tr > td) {
+  border-bottom: 1px solid var(--macos-border) !important;
+  padding: 10px 12px !important;
 }
 
-:deep(.ant-table-tbody > tr:hover > td) {
-  background: rgba(59, 130, 246, 0.05) !important;
+.animate-in {
+  animation: fadeIn 0.5s ease-out;
 }
 
-:deep(.ant-alert) {
-  background: rgba(59, 130, 246, 0.1) !important;
-  border: 1px solid rgba(59, 130, 246, 0.2) !important;
-  color: #e2e8f0 !important;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
