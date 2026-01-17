@@ -77,7 +77,7 @@ impl Database {
         ).execute(&self.pool).await?;
 
         // 创建索引以提升查询性能
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_audit_uploaded ON audit_logs(is_uploaded)")
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_audit_uploaded ON monitor_log_traffic(is_uploaded)")
             .execute(&self.pool).await?;
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_behavior_uploaded ON behavior_logs(is_uploaded)")
             .execute(&self.pool).await?;
@@ -114,10 +114,10 @@ impl Database {
         let _ = sqlx::query("ALTER TABLE behavior_logs ADD COLUMN mac TEXT").execute(&self.pool).await;
         let _ = sqlx::query("ALTER TABLE behavior_logs ADD COLUMN ip TEXT").execute(&self.pool).await;
 
-        // Audit Logs
-        let _ = sqlx::query("ALTER TABLE audit_logs ADD COLUMN host_id TEXT").execute(&self.pool).await;
-        let _ = sqlx::query("ALTER TABLE audit_logs ADD COLUMN mac TEXT").execute(&self.pool).await;
-        let _ = sqlx::query("ALTER TABLE audit_logs ADD COLUMN ip TEXT").execute(&self.pool).await;
+        // Audit Logs (monitor_log_traffic)
+        let _ = sqlx::query("ALTER TABLE monitor_log_traffic ADD COLUMN host_id TEXT").execute(&self.pool).await;
+        let _ = sqlx::query("ALTER TABLE monitor_log_traffic ADD COLUMN mac TEXT").execute(&self.pool).await;
+        let _ = sqlx::query("ALTER TABLE monitor_log_traffic ADD COLUMN ip TEXT").execute(&self.pool).await;
 
         // Screenshot Logs
         let _ = sqlx::query("ALTER TABLE screenshot_logs ADD COLUMN host_id TEXT").execute(&self.pool).await;

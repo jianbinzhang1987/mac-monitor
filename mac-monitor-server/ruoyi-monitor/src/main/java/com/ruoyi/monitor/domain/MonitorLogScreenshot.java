@@ -25,53 +25,53 @@ public class MonitorLogScreenshot extends BaseEntity {
 
     /** 设备序列号 */
     @Excel(name = "设备序列号")
-    @com.fasterxml.jackson.annotation.JsonProperty("cpe_id")
+    @com.fasterxml.jackson.annotation.JsonAlias("cpe_id")
     private String serialNumber;
 
     /** 截图时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "截图时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
-    @com.fasterxml.jackson.annotation.JsonProperty("capture_time")
+    @com.fasterxml.jackson.annotation.JsonAlias("capture_time")
     private Date captureTime;
 
     /** 文件路径 */
     @Excel(name = "文件路径")
-    @com.fasterxml.jackson.annotation.JsonProperty("image_path")
+    @com.fasterxml.jackson.annotation.JsonAlias("image_path")
     private String filePath;
 
     /** OCR识别文本 */
     @Excel(name = "OCR识别文本")
-    @com.fasterxml.jackson.annotation.JsonProperty("ocr_text")
+    @com.fasterxml.jackson.annotation.JsonAlias("ocr_text")
     private String ocrText;
 
     /** 风险等级(0-2) */
     @Excel(name = "风险等级(0-2)")
-    @com.fasterxml.jackson.annotation.JsonProperty("is_sensitive")
+    @com.fasterxml.jackson.annotation.JsonAlias("is_sensitive")
     private Integer riskLevel;
 
     /** 主机ID */
     @Excel(name = "主机ID")
-    @com.fasterxml.jackson.annotation.JsonProperty("host_id")
+    @com.fasterxml.jackson.annotation.JsonAlias("host_id")
     private String hostId;
 
     /** MAC地址 */
     @Excel(name = "MAC地址")
-    @com.fasterxml.jackson.annotation.JsonProperty("mac")
+    @com.fasterxml.jackson.annotation.JsonAlias("mac")
     private String mac;
 
     /** IP地址 */
     @Excel(name = "IP地址")
-    @com.fasterxml.jackson.annotation.JsonProperty("ip")
+    @com.fasterxml.jackson.annotation.JsonAlias("ip")
     private String ip;
 
     /** 应用名称 */
     @Excel(name = "应用名称")
-    @com.fasterxml.jackson.annotation.JsonProperty("app_name")
+    @com.fasterxml.jackson.annotation.JsonAlias("app_name")
     private String appName;
 
     /** 图片哈希 */
     @Excel(name = "图片哈希")
-    @com.fasterxml.jackson.annotation.JsonProperty("image_hash")
+    @com.fasterxml.jackson.annotation.JsonAlias("image_hash")
     private String imageHash;
 
     public void setLogId(Long logId) {

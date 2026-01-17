@@ -38,15 +38,13 @@
 
         <el-table v-loading="loading" :data="screenshotList" @selection-change="handleSelectionChange" border>
             <el-table-column type="selection" width="55" align="center" />
-            <el-table-column label="序列号" align="center" prop="serialNumber" width="150" />
+            <el-table-column label="主机IP" align="center" prop="ip" width="120" />
             <el-table-column label="图片预览" align="center" width="120">
                 <template slot-scope="scope">
                     <el-image
                         style="width: 80px; height: 45px; border-radius: 4px; border: 1px solid #ebeef5; cursor: pointer;"
-                        :src="scope.row.filePath"
-                        :preview-src-list="[scope.row.filePath]"
-                        fit="cover"
-                    >
+                        :src="baseUrl + scope.row.filePath" :preview-src-list="[baseUrl + scope.row.filePath]"
+                        fit="cover">
                         <div slot="error" class="image-slot">
                             <i class="el-icon-picture-outline"></i>
                         </div>
@@ -62,7 +60,8 @@
             </el-table-column>
             <el-table-column label="OCR识别内容" align="left" prop="ocrText">
                 <template slot-scope="scope">
-                    <div class="ocr-text-container">
+                    <div class="ocr-text-container" @click="handleViewOcr(scope.row)" style="cursor: pointer;"
+                        title="点击查看详情">
                         {{ scope.row.ocrText }}
                     </div>
                 </template>
@@ -72,6 +71,7 @@
                     <span>{{ parseTime(scope.row.captureTime) }}</span>
                 </template>
             </el-table-column>
+            <el-table-column label="序列号" align="center" prop="serialNumber" width="150" />
             <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="150">
                 <template slot-scope="scope">
                     <el-button size="mini" type="text" icon="el-icon-plus" @click="handleAddKeyword(scope.row)"
@@ -101,8 +101,19 @@
             </div>
         </el-dialog>
 
-        <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize"
-            @pagination="getList" />
+        <!-- OCR详情对话框 -->
+        <el-dialog title="OCR识别内容详情" :visible.sync="openOcr" width="600px" append-to-body>
+            <div
+                style="white-space: pre-wrap; word-break: break-all; max-height: 500px; overflow-y: auto; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+                {{ ocrDetail }}
+            </div>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="openOcr = false">关 闭</el-button>
+            </div>
+        </el-dialog>
+
+        <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum"
+            :limit.sync="queryParams.pageSize" @pagination="getList" />
     </div>
 </template>
 
@@ -114,6 +125,7 @@ export default {
     name: "ScreenshotLog",
     data() {
         return {
+            baseUrl: process.env.VUE_APP_BASE_API,
             // 遮罩层
             loading: true,
             // 选中数组
@@ -136,6 +148,10 @@ export default {
                 ocrText: '',
                 keyword: ''
             },
+            // OCR详情
+            openOcr: false,
+            ocrDetail: "",
+            // 查询参数
             // 查询参数
             queryParams: {
                 pageNum: 1,
@@ -256,6 +272,11 @@ export default {
             this.download('monitor/log/screenshot/export', {
                 ...this.queryParams
             }, `screenshot_${new Date().getTime()}.xlsx`)
+        },
+        /** 查看OCR详情 */
+        handleViewOcr(row) {
+            this.ocrDetail = row.ocrText;
+            this.openOcr = true;
         }
     }
 };

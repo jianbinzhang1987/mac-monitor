@@ -35,10 +35,36 @@ impl IpcServer {
     pub fn start(self) {
         std::thread::spawn(move || {
             let name = "/tmp/mac_monitor_audit.sock";
-            let _ = std::fs::remove_file(name);
 
-            let listener = LocalSocketListener::bind(name)
-                .expect("Failed to bind IPC socket");
+            // Try to remove old socket file
+            if let Err(e) = std::fs::remove_file(name) {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    eprintln!("⚠️  Warning: Failed to remove old socket file: {}", e);
+                    eprintln!("    If the socket is owned by root, run: sudo rm -f {}", name);
+                    eprintln!("    Attempting to bind anyway...");
+                }
+            }
+
+            let listener = match LocalSocketListener::bind(name) {
+                Ok(l) => l,
+                Err(e) => {
+                    eprintln!("❌ FATAL: Failed to bind IPC socket at {}: {}", name, e);
+                    eprintln!("    This usually means the socket file already exists and is owned by root.");
+                    eprintln!("    Please run: sudo rm -f {}", name);
+                    eprintln!("    Then restart the AuditService.");
+                    panic!("Failed to bind IPC socket: {}", e);
+                }
+            };
+
+            // Set permissions to 777 so GUI (non-root) can connect
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(metadata) = std::fs::metadata(name) {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o777);
+                if let Err(e) = std::fs::set_permissions(name, perms) {
+                    eprintln!("Failed to set IPC socket permissions: {}", e);
+                }
+            }
 
             println!("IPC server listening on {}", name);
 

@@ -2,20 +2,11 @@
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="设备号" prop="serialNumber">
-        <el-input
-          v-model="queryParams.serialNumber"
-          placeholder="请输入设备序列号"
-          clearable
-          @keyup.enter.native="handleQuery"
-        />
+        <el-input v-model="queryParams.serialNumber" placeholder="请输入设备序列号" clearable
+          @keyup.enter.native="handleQuery" />
       </el-form-item>
       <el-form-item label="域名" prop="domain">
-        <el-input
-          v-model="queryParams.domain"
-          placeholder="请输入域名"
-          clearable
-          @keyup.enter.native="handleQuery"
-        />
+        <el-input v-model="queryParams.domain" placeholder="请输入域名" clearable @keyup.enter.native="handleQuery" />
       </el-form-item>
       <el-form-item label="风险等级" prop="riskLevel">
         <el-select v-model="queryParams.riskLevel" placeholder="请选择风险等级" clearable>
@@ -32,31 +23,19 @@
 
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="el-icon-download"
-          size="mini"
-          @click="handleExport"
-          v-hasPermi="['monitor:log:traffic:export']"
-        >导出</el-button>
+        <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport"
+          v-hasPermi="['monitor:log:traffic:export']">导出</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="el-icon-delete"
-          size="mini"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['monitor:log:traffic:remove']"
-        >删除</el-button>
+        <el-button type="danger" plain icon="el-icon-delete" size="mini" :disabled="multiple" @click="handleDelete"
+          v-hasPermi="['monitor:log:traffic:remove']">删除</el-button>
       </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
     <el-table v-loading="loading" :data="trafficList" @selection-change="handleSelectionChange" border>
       <el-table-column type="selection" width="55" align="center" />
+      <el-table-column label="主机IP" align="center" prop="ip" width="120" />
       <el-table-column label="设备序列号" align="center" prop="serialNumber" width="150" />
       <el-table-column label="审计时间" align="center" prop="auditTime" width="160">
         <template slot-scope="scope">
@@ -75,31 +54,16 @@
       </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="150">
         <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-plus"
-            @click="handleAddWhitelist(scope.row)"
-            v-hasPermi="['monitor:policy:edit']"
-          >加入白名单</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['monitor:log:traffic:remove']"
-          >删除</el-button>
+          <el-button size="mini" type="text" icon="el-icon-plus" @click="handleAddWhitelist(scope.row)"
+            v-hasPermi="['monitor:policy:edit']">加入白名单</el-button>
+          <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)"
+            v-hasPermi="['monitor:log:traffic:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <pagination
-      v-show="total>0"
-      :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
-      @pagination="getList"
-    />
+    <pagination v-show="total > 0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize"
+      @pagination="getList" />
 
     <!-- 加入白名单对话框 -->
     <el-dialog title="将域名加入关联策略白名单" :visible.sync="whitelistOpen" width="500px" append-to-body>
@@ -245,12 +209,12 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const logIds = row.logId || this.ids;
-      this.$modal.confirm('是否确认删除流量审计日志编号为"' + logIds + '"的数据项？').then(function() {
+      this.$modal.confirm('是否确认删除流量审计日志编号为"' + logIds + '"的数据项？').then(function () {
         return delTraffic(logIds);
       }).then(() => {
         this.getList();
         this.$modal.msgSuccess("删除成功");
-      }).catch(() => {});
+      }).catch(() => { });
     },
     /** 导出按钮操作 */
     handleExport() {

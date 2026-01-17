@@ -237,6 +237,11 @@ async fn set_device_info(
     // let data = serde_json::to_vec(&payload).map_err(|e| format!("序列化失败: {}", e))?; // Removed as per new code
     // std::fs::write(&path, data).map_err(|e| format!("写入配置失败: {}", e))?; // Removed as per new code
 
+    // Write to /tmp/mac_monitor_device_info.json for traffic-proxy
+    let path = "/tmp/mac_monitor_device_info.json";
+    let data = serde_json::to_string(&payload).map_err(|e| format!("序列化失败: {}", e))?;
+    std::fs::write(path, data).map_err(|e| format!("写入共享配置失败: {}", e))?;
+
     let mut s = state.0.lock().unwrap();
     s.device_info = Some(payload);
 

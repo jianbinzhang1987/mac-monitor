@@ -40,6 +40,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Initial setup (Mock for now, should read from files)
     init_config();
 
+    // Periodic device info refresh
+    tokio::task::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+        loop {
+            interval.tick().await;
+            if let Err(e) = crate::mitm::update_device_info_from_file("/tmp/mac_monitor_device_info.json") {
+                debug!("Periodic device info update failed (file might not exist yet): {}", e);
+            }
+        }
+    });
+
     loop {
         let (stream, _) = listener.accept().await?;
         let io = TokioIo::new(stream);
@@ -301,12 +312,17 @@ fn is_benign_error(e: &dyn std::error::Error) -> bool {
 
 fn init_config() {
     // Load device info etc.
-    let _ = crate::mitm::set_device_info(crate::mitm::DeviceInfo {
-        ip: "127.0.0.1".into(),
-        mac: "00:00:00:00:00:00".into(),
-        pin_number: "unknown".into(),
-        cpe_id: "unknown".into(),
-        host_id: "unknown".into(),
-    });
+    if let Err(e) = crate::mitm::update_device_info_from_file("/tmp/mac_monitor_device_info.json") {
+        info!("Device info file not found or invalid ({}), using defaults.", e);
+        let _ = crate::mitm::set_device_info(crate::mitm::DeviceInfo {
+            ip: "127.0.0.1".into(),
+            mac: "00:00:00:00:00:00".into(),
+            pin_number: "unknown".into(),
+            cpe_id: "unknown".into(),
+            host_id: "unknown".into(),
+        });
+    } else {
+        info!("Loaded device info from /tmp/mac_monitor_device_info.json");
+    }
     // Policy defaults to empty which logs everything if no whitelists
 }

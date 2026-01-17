@@ -14,10 +14,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="processName"    column="process_name"    />
         <result property="riskLevel"    column="risk_level"    />
         <result property="createTime"    column="create_time"    />
+        <result property="ip"    column="ip"    />
+        <result property="mac"    column="mac"    />
+        <result property="hostId"    column="host_id"    />
     </resultMap>
 
     <sql id="selectMonitorLogTrafficVo">
-        select log_id, serial_number, audit_time, url, method, domain, process_name, risk_level, create_time from monitor_log_traffic
+        select log_id, serial_number, audit_time, url, method, domain, process_name, risk_level, create_time, ip, mac, host_id from monitor_log_traffic
     </sql>
 
     <select id="selectMonitorLogTrafficList" parameterType="MonitorLogTraffic" resultMap="MonitorLogTrafficResult">
@@ -47,6 +50,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processName != null">process_name,</if>
             <if test="riskLevel != null">risk_level,</if>
             <if test="createTime != null">create_time,</if>
+            <if test="ip != null">ip,</if>
+            <if test="mac != null">mac,</if>
+            <if test="hostId != null">host_id,</if>
          </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="serialNumber != null and serialNumber != ''">#{serialNumber},</if>
@@ -57,6 +63,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="processName != null">#{processName},</if>
             <if test="riskLevel != null">#{riskLevel},</if>
             <if test="createTime != null">#{createTime},</if>
+            <if test="ip != null">#{ip},</if>
+            <if test="mac != null">#{mac},</if>
+            <if test="hostId != null">#{hostId},</if>
          </trim>
     </insert>
 

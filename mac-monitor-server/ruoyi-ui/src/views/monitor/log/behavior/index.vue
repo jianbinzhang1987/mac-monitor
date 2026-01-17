@@ -44,6 +44,8 @@
     </el-row>
 
     <el-table v-loading="loading" :data="behaviorList" border>
+      <el-table-column label="主机IP" align="center" prop="ip" width="150" />
+      <el-table-column label="MAC地址" align="center" prop="mac" width="150" />
       <el-table-column label="设备序列号" align="center" prop="serialNumber" width="150" />
       <el-table-column label="事件时间" align="center" prop="eventTime" width="160">
         <template slot-scope="scope">

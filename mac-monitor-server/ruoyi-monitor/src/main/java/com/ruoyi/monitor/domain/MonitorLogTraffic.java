@@ -21,39 +21,78 @@ public class MonitorLogTraffic extends BaseEntity {
 
     /** 设备序列号 */
     @Excel(name = "设备序列号")
-    @com.fasterxml.jackson.annotation.JsonProperty("cpe_id")
+    @com.fasterxml.jackson.annotation.JsonAlias("cpe_id")
     private String serialNumber;
 
     /** 审计时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "审计时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
-    @com.fasterxml.jackson.annotation.JsonProperty("req_time")
+    @com.fasterxml.jackson.annotation.JsonAlias("req_time")
     private Date auditTime;
 
     /** 请求URL */
     @Excel(name = "请求URL")
-    @com.fasterxml.jackson.annotation.JsonProperty("url")
+    @com.fasterxml.jackson.annotation.JsonAlias("url")
     private String url;
 
     /** HTTP方法 */
     @Excel(name = "HTTP方法")
-    @com.fasterxml.jackson.annotation.JsonProperty("method_type")
+    @com.fasterxml.jackson.annotation.JsonAlias("method_type")
     private String method;
 
     /** 域名 */
     @Excel(name = "域名")
-    @com.fasterxml.jackson.annotation.JsonProperty("domain")
+    @com.fasterxml.jackson.annotation.JsonAlias("domain")
     private String domain;
 
     /** 进程名 */
     @Excel(name = "进程名")
-    @com.fasterxml.jackson.annotation.JsonProperty("process_name")
+    @com.fasterxml.jackson.annotation.JsonAlias("process_name")
     private String processName;
 
     /** 风险等级 (0-2) */
     @Excel(name = "风险等级")
-    @com.fasterxml.jackson.annotation.JsonProperty("risk_level")
+    @com.fasterxml.jackson.annotation.JsonAlias("risk_level")
     private Integer riskLevel;
+
+    /** 主机ID */
+    @Excel(name = "主机ID")
+    @com.fasterxml.jackson.annotation.JsonAlias("host_id")
+    private String hostId;
+
+    /** MAC地址 */
+    @Excel(name = "MAC地址")
+    @com.fasterxml.jackson.annotation.JsonAlias("mac")
+    private String mac;
+
+    /** IP地址 */
+    @Excel(name = "IP地址")
+    @com.fasterxml.jackson.annotation.JsonAlias("ip")
+    private String ip;
+
+    public void setHostId(String hostId) {
+        this.hostId = hostId;
+    }
+
+    public String getHostId() {
+        return hostId;
+    }
+
+    public void setMac(String mac) {
+        this.mac = mac;
+    }
+
+    public String getMac() {
+        return mac;
+    }
+
+    public void setIp(String ip) {
+        this.ip = ip;
+    }
+
+    public String getIp() {
+        return ip;
+    }
 
     public void setLogId(Long logId) {
         this.logId = logId;

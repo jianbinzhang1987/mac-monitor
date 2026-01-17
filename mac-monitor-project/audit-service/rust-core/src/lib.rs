@@ -271,9 +271,28 @@ async fn get_service_context() -> Arc<ServiceContext> {
 
 #[no_mangle]
 pub fn init_audit_core() {
+    // initialize file logging for debugging
+    use simplelog::*;
+    let _ = WriteLogger::init(
+        LevelFilter::Debug,
+        Config::default(),
+        std::fs::File::create("/tmp/mac_monitor_audit_service.log").unwrap()
+    );
+
+    log::info!("🚀 Audit Core initializing...");
+
     RUNTIME.spawn(async {
-        let _ = get_service_context().await;
-        log::info!("Audit Logic Core initialized successfully");
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| async {
+            get_service_context().await
+        })) {
+            Ok(future) => {
+                future.await;
+                log::info!("✅ Audit Logic Core initialized successfully");
+            }
+            Err(e) => {
+                log::error!("❌ Audit Core Initialization PANIC: {:?}", e);
+            }
+        }
     });
 }
 

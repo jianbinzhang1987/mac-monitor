@@ -21,23 +21,23 @@ public class MonitorLogBehavior extends BaseEntity {
 
     /** 设备序列号 */
     @Excel(name = "设备序列号")
-    @com.fasterxml.jackson.annotation.JsonProperty("cpe_id")
+    @com.fasterxml.jackson.annotation.JsonAlias("cpe_id")
     private String serialNumber;
 
     /** 事件时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "事件时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
-    @com.fasterxml.jackson.annotation.JsonProperty("op_time")
+    @com.fasterxml.jackson.annotation.JsonAlias("op_time")
     private Date eventTime;
 
     /** 事件类型 (PROCESS_LAUNCH, USB_INSERT, FILE_CHANGE) */
     @Excel(name = "事件类型")
-    @com.fasterxml.jackson.annotation.JsonProperty("op_type")
+    @com.fasterxml.jackson.annotation.JsonAlias("op_type")
     private String eventType;
 
     /** 相关进程 */
     @Excel(name = "相关进程")
-    @com.fasterxml.jackson.annotation.JsonProperty("proc")
+    @com.fasterxml.jackson.annotation.JsonAlias("proc")
     private String processName;
 
     /** 详细描述 (JSON) */
@@ -46,12 +46,12 @@ public class MonitorLogBehavior extends BaseEntity {
 
     /** 风险等级 (0-2) */
     @Excel(name = "风险等级")
-    @com.fasterxml.jackson.annotation.JsonProperty("risk_level")
+    @com.fasterxml.jackson.annotation.JsonAlias("risk_level")
     private Integer riskLevel;
 
     /** 主机ID */
     @Excel(name = "主机ID")
-    @com.fasterxml.jackson.annotation.JsonProperty("host_id")
+    @com.fasterxml.jackson.annotation.JsonAlias("host_id")
     private String hostId;
 
     /** MAC地址 */

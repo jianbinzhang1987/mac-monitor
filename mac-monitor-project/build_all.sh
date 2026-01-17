@@ -13,6 +13,22 @@ export PROJECT_ROOT="$SCRIPT_DIR"
 
 echo "📍 项目根目录: $PROJECT_ROOT"
 
+# 清理旧的 Socket 环境 (关键修复)
+SOCKET_FILE="/tmp/mac_monitor_audit.sock"
+if [ -e "$SOCKET_FILE" ]; then
+    echo "🧹 正在清理旧的 Socket 文件..."
+    if [ -w "$SOCKET_FILE" ]; then
+        rm -f "$SOCKET_FILE"
+    else
+        echo "⚠️  警告: Socket 文件 $SOCKET_FILE 被锁定或权限不足(通常是 root 拥有)。"
+        echo "   尝试使用 sudo 清理..."
+        sudo rm -f "$SOCKET_FILE" || {
+            echo "❌ 无法清理 Socket 文件。请手动运行: sudo rm -f $SOCKET_FILE"
+            # 不直接退出，给用户一个修复机会
+        }
+    fi
+fi
+
 # Detect Architecture
 ARCH_NAME=$(uname -m)
 if [ "$ARCH_NAME" = "x86_64" ]; then
@@ -147,6 +163,18 @@ echo "✅ Network Extension 构建成功: $APPEX_PATH"
 # ------------------------------------------
 echo ""
 echo "🛡️  [3/4] 构建 AuditService (Sidecar)..."
+
+# 3.1 构建 AuditService Rust Core
+echo "   🦀 Building AuditService Rust Core..."
+cd "$PROJECT_ROOT/audit-service/rust-core"
+cargo build --release
+if [ ! -f "target/release/libaudit_logic_core.a" ]; then
+    echo "❌ AuditService Rust Core 构建失败"
+    exit 1
+fi
+
+# 3.2 构建 AuditService Swift
+echo "   Swift Building..."
 cd "$PROJECT_ROOT/audit-service/swift"
 swift build -c release
 echo "✅ AuditService 编译完成"
@@ -273,6 +301,7 @@ echo "💿 DMG 安装包位置: output/Mac Monitor.dmg"
 # Generate DMG using appdmg (npx) for correct layout
 echo "📀 正在生成 DMG (修复图标重叠)..."
 if command -v npm >/dev/null; then
+    rm -f "$PROJECT_ROOT/output/Mac Monitor.dmg"
     npx -y appdmg "$PROJECT_ROOT/dmg-config.json" "$PROJECT_ROOT/output/Mac Monitor.dmg" || echo "⚠️ appdmg 生成失败"
 else
     echo "⚠️ npm 未安装，跳过 DMG 生成"

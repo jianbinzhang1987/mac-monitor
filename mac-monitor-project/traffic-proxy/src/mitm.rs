@@ -18,7 +18,7 @@ lazy_static! {
     static ref GLOBAL_AUDIT_POLICY: Mutex<AuditPolicy> = Mutex::new(AuditPolicy::default());
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DeviceInfo {
     pub pin_number: String,
     pub ip: String,
@@ -202,6 +202,13 @@ pub fn set_device_info(info: DeviceInfo) {
 
 fn current_device_info() -> DeviceInfo {
     GLOBAL_DEVICE_INFO.lock().unwrap().clone()
+}
+
+pub fn update_device_info_from_file(path: &str) -> Result<()> {
+    let content = std::fs::read_to_string(path).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+    let info: DeviceInfo = serde_json::from_str(&content).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+    set_device_info(info);
+    Ok(())
 }
 
 pub fn set_audit_policy_json(json: &str) -> Result<()> {

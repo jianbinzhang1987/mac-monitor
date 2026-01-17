@@ -12,24 +12,36 @@ func startAuditServices() {
     // Note: Rust Core also starts the IPC server on /tmp/mac_monitor_audit.sock
     rust_init_audit_core()
 
-    // Start IPC Server (Disabled in Swift as it's now handled by Rust Core)
-    // AuditIPCServer.shared.start()
-
     // Start Screen Capturer (if macOS 12.3+)
     if #available(macOS 12.3, *) {
+        print("📸 Initializing Screen Capturer...")
         ScreenCapturer.shared.start()
     } else {
         print("⚠️ Screen Capture requires macOS 12.3+")
     }
 
     // Start Clipboard Monitor
+    print("📋 Initializing Clipboard Monitor...")
     ClipboardMonitor.shared.start()
 
     print("✅ Audit Services started")
     print("📍 Socket location: /tmp/mac_monitor_audit.sock")
+    print("⏳ Entering main run loop...")
+}
+
+// Set up signal handling for graceful shutdown
+signal(SIGINT) { _ in
+    print("\n🛑 Received SIGINT, shutting down...")
+    exit(0)
+}
+
+signal(SIGTERM) { _ in
+    print("\n🛑 Received SIGTERM, shutting down...")
+    exit(0)
 }
 
 startAuditServices()
 
 // Prevent the process from exiting
-CFRunLoopRun()
+// Use a more robust way to keep the CLI tool alive
+RunLoop.main.run()
