@@ -223,7 +223,7 @@ impl Database {
                 ip,
                 mac,
                 host_id
-            FROM monitor_log_traffic WHERE is_uploaded = 0 LIMIT 10"#
+            FROM monitor_log_traffic WHERE is_uploaded = 0 LIMIT 1000"#
         )
         .fetch_all(&self.pool)
         .await?;
@@ -268,7 +268,7 @@ impl Database {
                 host_id,
                 mac,
                 ip
-            FROM behavior_logs WHERE is_uploaded = 0 LIMIT 10"#
+            FROM behavior_logs WHERE is_uploaded = 0 LIMIT 1000"#
         )
         .fetch_all(&self.pool)
         .await?;
@@ -314,7 +314,7 @@ impl Database {
                 mac,
                 ip,
                 redaction_labels
-            FROM screenshot_logs WHERE is_uploaded = 0 LIMIT 5"#
+            FROM screenshot_logs WHERE is_uploaded = 0 LIMIT 1000"#
         )
         .fetch_all(&self.pool)
         .await?;

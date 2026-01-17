@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -22,6 +22,8 @@ const registerForm = reactive({
   serverPort: '',
   cpeId: '',
   pin: '',
+  ip: '',
+  mac: '',
 })
 
 const emit = defineEmits(['loginSuccess'])
@@ -161,7 +163,9 @@ const handleRegister = async () => {
         server_ip: registerForm.serverIp,
         server_port: registerForm.serverPort,
         cpe_id: registerForm.cpeId,
-        pin: registerForm.pin
+        pin: registerForm.pin,
+        ip: registerForm.ip, // Pass accurate IP
+        mac: registerForm.mac // Pass accurate MAC
       }
     })
     message.success(res as string)
@@ -170,6 +174,24 @@ const handleRegister = async () => {
     message.error('注册失败: ' + err)
   }
 }
+
+onMounted(async () => {
+  try {
+    const info = await invoke('get_system_device_info') as DeviceInfo
+    registerForm.cpeId = info.cpe_id
+    registerForm.pin = info.pin_number
+    // Store IP/MAC in the form for registration if needed
+    Object.assign(registerForm, {
+      ip: info.ip,
+      mac: info.mac
+    })
+    
+    // Also sync with audit service immediately if possible
+    await invoke('set_device_info', { payload: info })
+  } catch (err) {
+    console.error('Failed to get system device info:', err)
+  }
+})
 </script>
 
 <template>

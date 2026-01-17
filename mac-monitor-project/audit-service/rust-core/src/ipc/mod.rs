@@ -266,6 +266,21 @@ impl IpcServer {
             "log_traffic" => {
                 match serde_json::from_value::<AuditLog>(cmd.payload) {
                     Ok(log) => {
+                        // Traffic Filtering Logic
+                        // Only record traffic for *.github.com and *.google.com
+                        let domain = log.domain.to_lowercase();
+                        let is_allowed = domain == "github.com" || domain.ends_with(".github.com") ||
+                                         domain == "google.com" || domain.ends_with(".google.com");
+
+                        if !is_allowed {
+                            println!("DEBUG: Ignoring traffic for domain: {}", domain);
+                            return IpcResponse {
+                                status: "ok".to_string(),
+                                message: "Log ignored (filtered)".to_string(),
+                                payload: None,
+                            };
+                        }
+
                         let db = self.db.clone();
                         self.runtime_handle.spawn(async move {
                             if let Err(e) = db.save_audit_log(&log).await {

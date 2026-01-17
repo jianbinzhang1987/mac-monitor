@@ -84,63 +84,7 @@ impl MitmProxy {
         Ok(config_arc)
     }
 
-    /// 处理 HTTPS 连接的 MitM 逻辑（当前为简化版）
-    pub fn handle_https_connection(&mut self, domain: &str, client_stream: &[u8]) -> Result<Vec<u8>> {
-        let _server_config = self.generate_cert_for_domain(domain)?;
-        let device_info = current_device_info();
 
-        let parsed = self.parse_http_request(client_stream).ok();
-        let (method, path, body) = if let Some(req) = parsed {
-            (req.method, req.path, req.body)
-        } else {
-            ("UNKNOWN".to_string(), "/".to_string(), Vec::new())
-        };
-
-        let url = if path.starts_with("http://") || path.starts_with("https://") {
-            path.clone()
-        } else {
-            format!("https://{}{}", domain, path)
-        };
-
-        let req_time = format_logical_time(LogicalClock::now());
-        let resp_time = format_logical_time(LogicalClock::now());
-        let url = if path.starts_with("http://") || path.starts_with("https://") {
-            path.clone()
-        } else {
-            format!("https://{}{}", domain, path)
-        };
-
-        if !should_log_request(domain, &url) {
-            return Ok(client_stream.to_vec());
-        }
-
-        let log = AuditLog {
-            pin_number: device_info.pin_number,
-            id: next_log_id(),
-            url: url.clone(),
-            req_time,
-            resp_time,
-            method_type: method,
-            ip: device_info.ip,
-            mac: device_info.mac,
-            cpe_id: device_info.cpe_id,
-            host_id: device_info.host_id,
-            status_code: "200".to_string(),
-            request_body: if body.is_empty() {
-                None
-            } else {
-                Some(String::from_utf8_lossy(&body).to_string())
-            },
-            response_body: None,
-            title: None,
-        };
-
-        if let Err(e) = self.send_log_to_service(&log) {
-            log::error!("Failed to send log via IPC: {}", e);
-        }
-
-        Ok(client_stream.to_vec())
-    }
 
     /// 解析 HTTP 请求，提取审计所需信息
     pub fn parse_http_request(&self, data: &[u8]) -> Result<HttpRequest> {
@@ -324,8 +268,94 @@ pub struct AuditLog {
     pub request_body: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_body: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
+
+    pub process_name: String,
+}
+
+impl MitmProxy {
+    // ... existing implementation ...
+
+    pub fn handle_https_connection(&mut self, domain: &str, client_stream: &[u8], src_port: u16) -> Result<Vec<u8>> {
+        let _server_config = self.generate_cert_for_domain(domain)?;
+        let device_info = current_device_info();
+
+        let parsed = self.parse_http_request(client_stream).ok();
+        let (method, path, body) = if let Some(req) = parsed {
+            (req.method, req.path, req.body)
+        } else {
+            ("UNKNOWN".to_string(), "/".to_string(), Vec::new())
+        };
+
+        let url = if path.starts_with("http://") || path.starts_with("https://") {
+            path.clone()
+        } else {
+            format!("https://{}{}", domain, path)
+        };
+
+        // Check if we need to log
+        if !should_log_request(domain, &url) {
+            return Ok(client_stream.to_vec());
+        }
+
+        let req_time = format_logical_time(LogicalClock::now());
+        let resp_time = format_logical_time(LogicalClock::now());
+
+        // Resolve process name
+        let process_name = resolve_process_name(src_port).unwrap_or_else(|| "unknown".to_string());
+
+        let log = AuditLog {
+            pin_number: device_info.pin_number,
+            id: next_log_id(),
+            url: url.clone(),
+            req_time,
+            resp_time,
+            method_type: method,
+            ip: device_info.ip,
+            mac: device_info.mac,
+            cpe_id: device_info.cpe_id,
+            host_id: device_info.host_id,
+            status_code: "200".to_string(),
+            request_body: if body.is_empty() {
+                None
+            } else {
+                Some(String::from_utf8_lossy(&body).to_string())
+            },
+            response_body: None,
+            process_name,
+        };
+
+        if let Err(e) = self.send_log_to_service(&log) {
+            log::error!("Failed to send log via IPC: {}", e);
+        }
+
+        Ok(client_stream.to_vec())
+    }
+}
+
+fn resolve_process_name(port: u16) -> Option<String> {
+    use std::process::Command;
+    // Attempt to use lsof to find the process using the port
+    // Command: lsof -i :<port> -sTCP:ESTABLISHED -F c
+    // Output format with -F c:
+    // p12345
+    // cProcessName
+    
+    // Note: lsof might require sudo or might not work in sandbox. 
+    // Trying best effort.
+    let output = Command::new("lsof")
+        .args(&["-i", &format!(":{}", port), "-sTCP:ESTABLISHED", "-F", "c"])
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let s = String::from_utf8_lossy(&output.stdout);
+        for line in s.lines() {
+            if line.starts_with('c') {
+                return Some(line[1..].to_string());
+            }
+        }
+    }
+    None
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

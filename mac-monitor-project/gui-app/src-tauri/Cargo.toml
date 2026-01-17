@@ -18,3 +18,4 @@ tokio = { version = "1.49.0", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
 tauri-plugin-shell = "2.3.4"
 tauri-plugin-autostart = "2.3.4"
+sysinfo = "0.37.2"

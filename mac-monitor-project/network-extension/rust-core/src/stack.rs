@@ -74,7 +74,7 @@ impl NetworkStack {
                         
                         let mut proxy = self.mitm_proxy.lock().unwrap();
                         // 调用 MITM 逻辑进行审计上报
-                        if let Ok(_) = proxy.handle_https_connection(&domain, &data[..len]) {
+                        if let Ok(_) = proxy.handle_https_connection(&domain, &data[..len], remote_endpoint.port) {
                             // 审计逻辑处理完成后，数据透传（此处为简化版实现）
                         }
                     }

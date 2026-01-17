@@ -33,7 +33,7 @@ CREATE TABLE `monitor_policy` (
   `screenshot_rules`    text                            COMMENT '截屏规则(JSON)',
   `agent_settings`      text                            COMMENT '客户端设置(JSON)',
   `is_default`          char(1)         DEFAULT '0'     COMMENT '是否默认(1是 0否)',
-  `version`             bigint(20)      DEFAULT 1       COMMENT '策略版本(时间戳)',
+  `version`             varchar(32)     DEFAULT '1.0.0' COMMENT '策略版本(语义化版本)',
   `create_by`           varchar(64)     DEFAULT ''      COMMENT '创建者',
   `create_time`         datetime                        COMMENT '创建时间',
   `update_by`           varchar(64)     DEFAULT ''      COMMENT '更新者',

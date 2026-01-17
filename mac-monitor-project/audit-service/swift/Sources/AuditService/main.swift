@@ -52,6 +52,6 @@ startAuditServices()
 
 print("⏳ Entering main dispatch loop (dispatchMain)...")
 
-// Use dispatchMain() - this is the most robust way to keep a CLI daemon alive
-// It never returns and processes all dispatch queues (including Tokio's)
-dispatchMain()
+// Use RunLoop.main.run() to ensure Timers (like in ClipboardMonitor) work correctly.
+// dispatchMain() does NOT drive the RunLoop.
+RunLoop.main.run()

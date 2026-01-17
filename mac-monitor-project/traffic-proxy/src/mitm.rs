@@ -148,7 +148,7 @@ impl MitmProxy {
     }
 
     // Returns serialized JSON byte vector if logging is needed, otherwise None.
-    pub fn prepare_audit_log(&self, domain: &str, method: &str, path: &str, body: &[u8]) -> Result<Option<Vec<u8>>> {
+    pub fn prepare_audit_log(&self, domain: &str, method: &str, path: &str, body: &[u8], src_port: u16) -> Result<Option<Vec<u8>>> {
         let url = if path.starts_with("http://") || path.starts_with("https://") {
             path.to_string()
         } else {
@@ -162,6 +162,9 @@ impl MitmProxy {
         let device_info = current_device_info();
         let req_time = format_logical_time(LogicalClock::now());
         let resp_time = format_logical_time(LogicalClock::now());
+
+        // Resolve process name
+        let process_name = resolve_process_name(src_port).unwrap_or_else(|| "unknown".to_string());
 
         let log = AuditLog {
             pin_number: device_info.pin_number,
@@ -179,6 +182,7 @@ impl MitmProxy {
             request_body: if body.is_empty() { None } else { Some(String::from_utf8_lossy(body).to_string()) },
             response_body: None,
             title: None,
+            process_name,
         };
 
         let command = serde_json::json!({
@@ -188,6 +192,25 @@ impl MitmProxy {
 
         Ok(Some(serde_json::to_vec(&command)?))
     }
+}
+
+fn resolve_process_name(port: u16) -> Option<String> {
+    use std::process::Command;
+    // Command: lsof -i :<port> -sTCP:ESTABLISHED -F c
+    let output = Command::new("lsof")
+        .args(&["-i", &format!(":{}", port), "-sTCP:ESTABLISHED", "-F", "c"])
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let s = String::from_utf8_lossy(&output.stdout);
+        for line in s.lines() {
+            if line.starts_with('c') {
+                return Some(line[1..].to_string());
+            }
+        }
+    }
+    None
 }
 
 fn next_log_id() -> String {
@@ -310,6 +333,7 @@ pub struct AuditLog {
     pub response_body: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    pub process_name: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

@@ -11,7 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="screenshotRules"    column="screenshot_rules"    />
         <result property="agentSettings"    column="agent_settings"    />
         <result property="isDefault"    column="is_default"    />
-        <result property="version"    column="version"    />
+        <result property="version"    column="version"    jdbcType="VARCHAR" />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
         <result property="updateBy"    column="update_by"    />

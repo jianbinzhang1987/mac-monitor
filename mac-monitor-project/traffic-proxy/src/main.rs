@@ -52,14 +52,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     });
 
     loop {
-        let (stream, _) = listener.accept().await?;
+        let (stream, addr) = listener.accept().await?;
+        let src_port = addr.port();
         let io = TokioIo::new(stream);
 
         tokio::task::spawn(async move {
             if let Err(err) = http1::Builder::new()
                 .preserve_header_case(true)
                 .title_case_headers(true)
-                .serve_connection(io, service_fn(proxy))
+                .serve_connection(io, service_fn(move |req| {
+                    proxy(req, src_port)
+                }))
                 .with_upgrades()
                 .await
             {
@@ -69,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 }
 
-async fn proxy(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Error> {
+async fn proxy(req: Request<Incoming>, src_port: u16) -> Result<Response<Full<Bytes>>, hyper::Error> {
     if Method::CONNECT == req.method() {
         // HTTPS Tunneling
         if let Some(host) = req.uri().authority().map(|auth| auth.host()) {
@@ -77,7 +80,7 @@ async fn proxy(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::E
              tokio::task::spawn(async move {
                 match hyper::upgrade::on(req).await {
                     Ok(upgraded) => {
-                        if let Err(e) = tunnel(upgraded, host).await {
+                        if let Err(e) = tunnel(upgraded, host, src_port).await {
                             if is_benign_error(&e) {
                                 debug!("server connection benign error: {}", e);
                             } else {
@@ -92,7 +95,7 @@ async fn proxy(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::E
         } else {
              Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from("CONNECT must be to a socket address")))
+                .body(Full::new(Bytes::new()))
                 .unwrap())
         }
     } else {
@@ -107,11 +110,11 @@ async fn proxy(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::E
         // To be fully functional, needs a Client to forward.
         
         // Let's implement simple forwarding
-        handle_http_request(req).await
+        handle_http_request(req, src_port).await
     }
 }
 
-async fn tunnel(upgraded: hyper::upgrade::Upgraded, host: String) -> std::io::Result<()> {
+async fn tunnel(upgraded: hyper::upgrade::Upgraded, host: String, src_port: u16) -> std::io::Result<()> {
     let server_config = {
         let mut proxy = MITM_PROXY.lock().unwrap();
         proxy.generate_cert_for_domain(&host)
@@ -129,7 +132,7 @@ async fn tunnel(upgraded: hyper::upgrade::Upgraded, host: String) -> std::io::Re
     
     let service = service_fn(move |req| {
         let host = host.clone();
-        handle_proxied_request(req, host)
+        handle_proxied_request(req, host, src_port)
     });
 
     if let Err(_err) = http1::Builder::new()
@@ -144,7 +147,7 @@ async fn tunnel(upgraded: hyper::upgrade::Upgraded, host: String) -> std::io::Re
     Ok(())
 }
 
-async fn handle_proxied_request(req: Request<Incoming>, domain: String) -> Result<Response<Full<Bytes>>, Box<dyn std::error::Error + Send + Sync>> {
+async fn handle_proxied_request(req: Request<Incoming>, domain: String, src_port: u16) -> Result<Response<Full<Bytes>>, Box<dyn std::error::Error + Send + Sync>> {
     // 1. Log the request
     let method = req.method().to_string();
     let path = req.uri().path().to_string();
@@ -155,7 +158,7 @@ async fn handle_proxied_request(req: Request<Incoming>, domain: String) -> Resul
     
     let log_payload = {
         let mut proxy = MITM_PROXY.lock().unwrap();
-        proxy.prepare_audit_log(&domain, &method, &path, &body_bytes).unwrap_or(None)
+        proxy.prepare_audit_log(&domain, &method, &path, &body_bytes, src_port).unwrap_or(None)
     };
     
     if let Some(data) = log_payload {
@@ -223,7 +226,7 @@ async fn handle_proxied_request(req: Request<Incoming>, domain: String) -> Resul
     Ok(Response::from_parts(res_parts, Full::new(res_bytes)))
 }
 
-async fn handle_http_request(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Error> {
+async fn handle_http_request(req: Request<Incoming>, src_port: u16) -> Result<Response<Full<Bytes>>, hyper::Error> {
     let path = req.uri().path();
     
     // Check for /ssl
@@ -250,7 +253,7 @@ async fn handle_http_request(req: Request<Incoming>) -> Result<Response<Full<Byt
     let path_str = uri.path().to_string();
     let log_payload = {
         let mut proxy = MITM_PROXY.lock().unwrap();
-        proxy.prepare_audit_log(&host, method.as_str(), &path_str, &body_bytes).unwrap_or(None)
+        proxy.prepare_audit_log(&host, method.as_str(), &path_str, &body_bytes, src_port).unwrap_or(None)
     };
     
     if let Some(data) = log_payload {

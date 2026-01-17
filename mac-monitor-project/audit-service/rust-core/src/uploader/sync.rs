@@ -31,7 +31,7 @@ impl SyncService {
 
     pub fn start(self) {
         tokio::spawn(async move {
-            let mut interval = time::interval(Duration::from_secs(60)); // 每分钟同步一次
+            let mut interval = time::interval(Duration::from_secs(30)); // 每 30 秒同步一次
             let mut scanner = Scanner::new(self.db.clone(), self.policy.clone(), self.device_info.clone());
             loop {
                 interval.tick().await;

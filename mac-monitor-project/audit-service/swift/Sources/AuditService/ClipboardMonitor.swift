@@ -39,17 +39,22 @@ class ClipboardMonitor {
     private func checkClipboard() {
         // 1. Check if change count incremented
         guard pasteboard.changeCount != lastChangeCount else { return }
+        print("📋 Debug: Change count changed from \(lastChangeCount) to \(pasteboard.changeCount)")
         lastChangeCount = pasteboard.changeCount
 
         // 2. Identify the active application
-        guard let frontApp = NSWorkspace.shared.frontmostApplication else { return }
+        guard let frontApp = NSWorkspace.shared.frontmostApplication else {
+            print("📋 Debug: Could not get frontmost application")
+            return
+        }
+        print("📋 Debug: Front app: \(frontApp.localizedName ?? "nil"), Bundle: \(frontApp.bundleIdentifier ?? "nil")")
         guard let bundleId = frontApp.bundleIdentifier else { return }
 
         // 3. Filter: Only log if it's a browser in the whitelist
         // Note: You can comment out this guard if you want to monitor ALL apps
         guard browserWhitelist.contains(bundleId) else {
             // Optional debug log
-            // print("📋 Clipboard change ignored from non-browser: \(bundleId)")
+            print("📋 Clipboard change ignored from non-browser: \(bundleId)")
             return
         }
 

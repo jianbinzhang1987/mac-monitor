@@ -249,6 +249,111 @@ async fn set_device_info(
 }
 
 #[tauri::command]
+async fn get_system_device_info() -> Result<DeviceInfoPayload, String> {
+    println!("Called get_system_device_info");
+    let mut sys = sysinfo::System::new_all();
+    sys.refresh_all();
+
+    let host_name = sysinfo::System::host_name().unwrap_or_else(|| "Unknown-Mac".to_string());
+    let serial_number = get_macos_serial_number().unwrap_or_else(|| "UNKNOWN_SERIAL".to_string());
+    let ip_addr = get_local_ip().unwrap_or_else(|| "127.0.0.1".to_string());
+    let mac_addr = get_local_mac().unwrap_or_else(|| "00:00:00:00:00:00".to_string());
+
+    println!("Device Info Found: Host={}, Serial={}, IP={}, MAC={}", host_name, serial_number, ip_addr, mac_addr);
+
+    Ok(DeviceInfoPayload {
+        pin_number: serial_number.clone(),
+        ip: ip_addr,
+        mac: mac_addr,
+        cpe_id: serial_number,
+        host_id: host_name,
+    })
+}
+
+fn get_macos_serial_number() -> Option<String> {
+    use std::process::Command;
+    let output = Command::new("ioreg")
+        .args(&["-c", "IOPlatformExpertDevice", "-d", "2"])
+        .output()
+        .ok()?;
+
+    let s = String::from_utf8_lossy(&output.stdout);
+    for line in s.lines() {
+        if line.contains("IOPlatformSerialNumber") {
+            let parts: Vec<&str> = line.split('=').collect();
+            if parts.len() == 2 {
+                return Some(parts[1].trim().trim_matches(|c| c == '"' || c == ' ').to_string());
+            }
+        }
+    }
+    None
+}
+
+fn get_primary_interface_name() -> Option<String> {
+    use std::process::Command;
+    let output = Command::new("route")
+        .args(&["-n", "get", "default"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let s = String::from_utf8_lossy(&output.stdout);
+    for line in s.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("interface:") {
+            let iface = rest.trim();
+            if !iface.is_empty() {
+                return Some(iface.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn get_local_ip() -> Option<String> {
+    if let Some(interface) = get_primary_interface_name() {
+        use std::process::Command;
+        let output = Command::new("ipconfig")
+            .args(&["getifaddr", &interface])
+            .output()
+            .ok()?;
+        if output.status.success() {
+            let ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !ip.is_empty() {
+                return Some(ip);
+            }
+        }
+    }
+    None
+}
+
+fn get_local_mac() -> Option<String> {
+    let interface = get_primary_interface_name()?;
+    use std::process::Command;
+    let output = Command::new("ifconfig")
+        .arg(&interface)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let s = String::from_utf8_lossy(&output.stdout);
+    for line in s.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("ether ") {
+            let mac = rest.split_whitespace().next().unwrap_or("").trim();
+            if !mac.is_empty() {
+                return Some(mac.to_string());
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
 async fn set_audit_policy(
     payload: AuditPolicyPayload,
     app_handle: tauri::AppHandle,
@@ -591,7 +696,8 @@ fn main() {
             start_vpn, stop_vpn, get_vpn_status,
             enable_proxy, disable_proxy,
             enable_monitoring, disable_monitoring,
-            get_screenshot_logs, get_clipboard_logs
+            get_screenshot_logs, get_clipboard_logs,
+            get_system_device_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
