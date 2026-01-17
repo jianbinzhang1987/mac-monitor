@@ -9,10 +9,13 @@ class ProxyManager {
         // For this standalone helper, we'll try to start it if we can find it nearby.
         startTrafficProxy()
         
-        // 2. Trust Root Certificate
+        // 2. Start AuditService (Monitoring: Screenshots, Scanner)
+        startAuditService()
+        
+        // 3. Trust Root Certificate
         trustRootCertificate()
         
-        // 3. Set System Proxy
+        // 4. Set System Proxy
         runCommand("/usr/sbin/networksetup", arguments: ["-setwebproxy", "Wi-Fi", "127.0.0.1", "8050"])
         runCommand("/usr/sbin/networksetup", arguments: ["-setsecurewebproxy", "Wi-Fi", "127.0.0.1", "8050"])
         print("System Proxy Enabled (Wi-Fi -> 127.0.0.1:8050)")
@@ -23,12 +26,18 @@ class ProxyManager {
         runCommand("/usr/sbin/networksetup", arguments: ["-setsecurewebproxystate", "Wi-Fi", "off"])
         print("System Proxy Disabled")
         stopTrafficProxy()
+        stopAuditService()
     }
 
     private func stopTrafficProxy() {
         // Kill by name using pkill, which is simplest for this helper tool
         print("Stopping traffic-proxy...")
         runCommand("/usr/bin/pkill", arguments: ["-f", "traffic-proxy"])
+    }
+
+    func stopAuditService() {
+        print("Stopping AuditService...")
+        runCommand("/usr/bin/pkill", arguments: ["-f", "AuditService"])
     }
     
     private func startTrafficProxy() {
@@ -86,6 +95,61 @@ class ProxyManager {
             sleep(1) // Give it a sec to bind port
         } catch {
             print("Failed to start traffic-proxy: \(error)")
+        }
+    }
+
+    func startAuditService() {
+        // Check if already running
+        let pgrep = Process()
+        pgrep.launchPath = "/usr/bin/pgrep"
+        pgrep.arguments = ["-f", "AuditService"]
+        let pipe = Pipe()
+        pgrep.standardOutput = pipe
+        pgrep.launch()
+        pgrep.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if !data.isEmpty {
+            print("AuditService is already running.")
+            return
+        }
+
+        // AuditService.app is in Resources in the final bundle, 
+        // but for now we look for it in the same dir as vpn-helper.
+        let currentUrl = URL(fileURLWithPath: CommandLine.arguments[0])
+        let binDir = currentUrl.deletingLastPathComponent()
+        
+        let candidates = [
+            "AuditService.app/Contents/MacOS/AuditService",
+            "AuditService-x86_64-apple-darwin",
+            "AuditService-aarch64-apple-darwin",
+            "AuditService"
+        ]
+        
+        var auditPath: String? = nil
+        for cand in candidates {
+            let p = binDir.appendingPathComponent(cand).path
+            if FileManager.default.fileExists(atPath: p) {
+                auditPath = p
+                break
+            }
+        }
+        
+        guard let validAuditPath = auditPath else {
+            print("Warning: AuditService binary not found in \(binDir.path).")
+            return
+        }
+        
+        let task = Process()
+        task.launchPath = validAuditPath
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        
+        do {
+            try task.run()
+            print("Started AuditService at \(validAuditPath)")
+        } catch {
+            print("Failed to start AuditService: \(error)")
         }
     }
     

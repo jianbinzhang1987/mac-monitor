@@ -1,0 +1,22 @@
+{
+  "identifier": "allow-audit-commands",
+  "description": "Permissions for all Mac Monitor audit commands",
+  "commands": [
+    "register",
+    "login",
+    "set_device_info",
+    "set_audit_policy",
+    "get_pop_nodes",
+    "switch_pop_node",
+    "check_for_updates",
+    "start_vpn",
+    "stop_vpn",
+    "get_vpn_status",
+    "enable_proxy",
+    "disable_proxy",
+    "enable_monitoring",
+    "disable_monitoring",
+    "set_redaction_status",
+    "get_screenshot_logs"
+  ]
+}

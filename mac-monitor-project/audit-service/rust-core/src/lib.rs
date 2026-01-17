@@ -285,7 +285,8 @@ pub extern "C" fn analyze_enhanced_image(
     height: u32,
     app_name: *const c_char,
     is_sensitive: bool,
-    ocr_text: *const c_char
+    ocr_text: *const c_char,
+    redaction_labels: *const c_char
 ) {
     eprintln!(
         "analyze_enhanced_image called: len={}, width={}, height={}",
@@ -311,11 +312,20 @@ pub extern "C" fn analyze_enhanced_image(
         None
     };
 
+    let redaction_labels_str = if !redaction_labels.is_null() {
+        let s = unsafe { CStr::from_ptr(redaction_labels).to_string_lossy().into_owned() };
+        if s.is_empty() { None } else { Some(s) }
+    } else {
+        None
+    };
+
     let raw_data = unsafe { std::slice::from_raw_parts(ptr, len) };
     let data_vec = raw_data.to_vec();
 
     RUNTIME.spawn(async move {
         let ctx = get_service_context().await;
+        // ... (rest of the logic)
+        // Ensure redaction_labels is passed to ScreenshotLog construction below
 
         // 1. 构建 ImageBuffer (Swift 传过来的是 RGBA)
         let width_usize = width as usize;
@@ -421,6 +431,7 @@ pub extern "C" fn analyze_enhanced_image(
                 cpe_id: ctx.device_info.cpe_id.clone(),
                 mac: ctx.device_info.mac.clone(),
                 ip: ctx.device_info.ip.clone(),
+                redaction_labels: redaction_labels_str,
             };
 
             if let Err(e) = ctx.db.save_screenshot_log(&log).await {

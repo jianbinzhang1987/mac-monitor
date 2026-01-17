@@ -11,23 +11,12 @@ class AuditIPCServer {
     
     func start() {
         print("🔌 Audit IPC Server: Starting on \(socketPath)...")
-        
+
         // 清理旧的套接字文件
         unlink(socketPath)
-        
-        do {
-            // 使用 Network.framework 监听 Unix Domain Socket
-            // 注意：在 macOS 12+ 建议使用 NWListener
-            let endpoint = NWEndpoint.unix(path: socketPath)
-            let params = NWParameters.tcp
-            // 这里通常需要自定义参数来支持 Unix Domain Socket，
-            // 简化演示：我们使用更传统的 POSIX Socket 接口实现
-            
-            startPosixSocketServer()
-            
-        } catch {
-            print("❌ Failed to start IPC Server: \(error)")
-        }
+
+        // 使用更传统的 POSIX Socket 接口实现
+        startPosixSocketServer()
     }
     
     private func startPosixSocketServer() {
@@ -45,11 +34,17 @@ class AuditIPCServer {
             }
             
             let len = socklen_t(MemoryLayout<sa_family_t>.size + pathLen + 1)
-            
+
             unlink(self.socketPath)
-            
-            guard bind(serverFd, UnsafeRawPointer(&addr).assumingMemoryBound(to: sockaddr.self), len) >= 0 else {
-                print("❌ Bind failed")
+
+            let success = withUnsafePointer(to: &addr) { ptr in
+                ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPtr in
+                    bind(serverFd, sockaddrPtr, len) >= 0
+                }
+            }
+
+            guard success else {
+                print("❌ Bind failed: \(String(cString: strerror(errno)))")
                 return
             }
             

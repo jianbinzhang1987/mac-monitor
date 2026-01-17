@@ -13,8 +13,12 @@ if args.contains("--start") {
     ProxyManager.shared.enableSystemProxy()
 } else if args.contains("--disable-proxy") {
     ProxyManager.shared.disableSystemProxy()
+} else if args.contains("--enable-monitoring") {
+    ProxyManager.shared.startAuditService()
+} else if args.contains("--disable-monitoring") {
+    ProxyManager.shared.stopAuditService()
 } else {
-    print("Usage: vpn-helper [--start | --stop | --status | --enable-proxy | --disable-proxy]")
+    print("Usage: vpn-helper [--start | --stop | --status | --enable-proxy | --disable-proxy | --enable-monitoring | --disable-monitoring]")
 }
 
 // Wait strictly for asynchronous operations to complete

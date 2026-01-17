@@ -101,6 +101,7 @@ impl Database {
         let _ = sqlx::query("ALTER TABLE screenshot_logs ADD COLUMN host_id TEXT").execute(&self.pool).await;
         let _ = sqlx::query("ALTER TABLE screenshot_logs ADD COLUMN mac TEXT").execute(&self.pool).await;
         let _ = sqlx::query("ALTER TABLE screenshot_logs ADD COLUMN ip TEXT").execute(&self.pool).await;
+        let _ = sqlx::query("ALTER TABLE screenshot_logs ADD COLUMN redaction_labels TEXT").execute(&self.pool).await;
 
         Ok(())
     }
@@ -147,8 +148,8 @@ impl Database {
 
     pub async fn save_screenshot_log(&self, log: &ScreenshotLog) -> Result<(), sqlx::Error> {
         sqlx::query(
-            "INSERT INTO screenshot_logs (capture_time, cpe_id, image_path, ocr_text, risk_level, app_name, image_hash, host_id, mac, ip)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO screenshot_logs (capture_time, cpe_id, image_path, ocr_text, risk_level, app_name, image_hash, host_id, mac, ip, redaction_labels)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&log.capture_time)
         .bind(&log.cpe_id)
@@ -160,6 +161,7 @@ impl Database {
         .bind(&log.host_id)
         .bind(&log.mac)
         .bind(&log.ip)
+        .bind(&log.redaction_labels)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -268,7 +270,8 @@ impl Database {
                 image_hash,
                 host_id,
                 mac,
-                ip
+                ip,
+                redaction_labels
             FROM screenshot_logs WHERE is_uploaded = 0 LIMIT 5"#
         )
         .fetch_all(&self.pool)
@@ -288,6 +291,7 @@ impl Database {
                 host_id: row.try_get("host_id")?,
                 mac: row.try_get("mac")?,
                 ip: row.try_get("ip")?,
+                redaction_labels: row.try_get::<Option<String>, _>("redaction_labels")?,
             });
         }
         Ok(logs)

@@ -1,33 +1,47 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
+import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 interface Screenshot {
-  id: string;
-  timestamp: string;
+  id: number;
+  capture_time: string;
   app_name: string;
-  is_sensitive: boolean;
-  ocr_text: string;
-  thumbnail_path: string;
+  risk_level: number;
+  ocr_text: string | null;
+  image_path: string;
+  redaction_labels: string | null;
+  display_path?: string;
 }
 
 const loading = ref(false);
 const screenshots = ref<Screenshot[]>([]);
+const privacyMode = ref(true);
+
+const togglePrivacyMode = async (checked: boolean) => {
+  try {
+    const res = await invoke<string>('set_redaction_status', { enabled: checked });
+    message.success(checked ? '隐私保护模式已开启' : '隐私保护模式已关闭');
+    privacyMode.value = checked;
+  } catch (err) {
+    message.error('切换隐私模式失败: ' + err);
+    privacyMode.value = !checked; // 恢复状态
+  }
+};
 
 const loadScreenshots = async () => {
   loading.value = true;
   try {
-    // Mock 数据
-    screenshots.value = Array.from({ length: 8 }, (_, i) => ({
-      id: `shot-${i}`,
-      timestamp: new Date(Date.now() - i * 300000).toLocaleString('zh-CN'),
-      app_name: ['WeChat', 'QQ', 'Safari', 'Chrome'][i % 4],
-      is_sensitive: i % 3 === 0,
-      ocr_text: i % 3 === 0 ? '检测到敏感关键词：密码、账号' : '无敏感内容',
-      thumbnail_path: `https://via.placeholder.com/300x200?text=Screenshot+${i}`,
+    const res = await invoke<Screenshot[]>('get_screenshot_logs');
+    console.log('Fetched screenshots:', res);
+    screenshots.value = res.map(s => ({
+      ...s,
+      // 转换本地文件路径为 WebView 可访问的 URL
+      display_path: convertFileSrc(s.image_path)
     }));
   } catch (err) {
-    message.error('加载截图记录失败');
+    message.error('加载截图记录失败: ' + err);
     console.error(err);
   } finally {
     loading.value = false;
@@ -41,6 +55,26 @@ onMounted(() => {
 const handleViewDetail = (screenshot: Screenshot) => {
   message.info(`查看截图详情: ${screenshot.id}`);
 };
+
+const getLabelColor = (label: string) => {
+  const colors: Record<string, string> = {
+    'PatternMatch': 'red',
+    'KeywordInline': 'orange',
+    'KeywordNext': 'gold',
+    'NLP-Name': 'purple'
+  };
+  return colors[label] || 'blue';
+};
+
+const getLabelDesc = (label: string) => {
+  const descs: Record<string, string> = {
+    'PatternMatch': '正则模式匹配 (身份证/手机/卡号/邮箱/IP/车牌)',
+    'KeywordInline': '标签内联敏感词 (如 用户名: xxx)',
+    'KeywordNext': '标签关联敏感信息 (如 密码后面紧跟的内容)',
+    'NLP-Name': 'NLP 语义识别出的姓名'
+  };
+  return descs[label] || '检测到敏感信息';
+};
 </script>
 
 <template>
@@ -48,6 +82,10 @@ const handleViewDetail = (screenshot: Screenshot) => {
     <div class="page-header">
       <h3 class="page-title">界面截图记录</h3>
       <div class="actions">
+        <div class="privacy-toggle">
+          <span class="label">隐私保护模式</span>
+          <a-switch :checked="privacyMode" @change="togglePrivacyMode" />
+        </div>
         <a-button type="primary" @click="loadScreenshots" :loading="loading">
           刷新
         </a-button>
@@ -65,8 +103,10 @@ const handleViewDetail = (screenshot: Screenshot) => {
     <div class="screenshot-grid" v-if="!loading">
       <div v-for="shot in screenshots" :key="shot.id" class="screenshot-card card-glass">
         <div class="screenshot-preview">
-          <img :src="shot.thumbnail_path" :alt="shot.app_name" />
-          <div v-if="shot.is_sensitive" class="sensitive-badge">
+          <img :src="shot.display_path" :alt="shot.app_name" v-if="shot.display_path" />
+          <div v-else class="no-image">无预览</div>
+
+          <div v-if="shot.risk_level > 0" class="sensitive-badge">
             <a-tag color="error">敏感内容</a-tag>
           </div>
         </div>
@@ -75,13 +115,24 @@ const handleViewDetail = (screenshot: Screenshot) => {
             <span class="label">应用：</span>
             <a-tag color="blue">{{ shot.app_name }}</a-tag>
           </div>
+          <div class="info-row" v-if="shot.redaction_labels">
+            <span class="label">识别原因：</span>
+            <div class="labels-container">
+              <a-tooltip v-for="label in shot.redaction_labels.split(',')" :key="label">
+                <template #title>{{ getLabelDesc(label) }}</template>
+                <a-tag :color="getLabelColor(label)">
+                  {{ label }}
+                </a-tag>
+              </a-tooltip>
+            </div>
+          </div>
           <div class="info-row">
             <span class="label">时间：</span>
-            <span class="value">{{ shot.timestamp }}</span>
+            <span class="value">{{ shot.capture_time }}</span>
           </div>
           <div class="info-row">
             <span class="label">OCR：</span>
-            <span class="value ocr-text">{{ shot.ocr_text }}</span>
+            <span class="value ocr-text">{{ shot.ocr_text || '未提取到文本' }}</span>
           </div>
           <a-button type="link" size="small" @click="handleViewDetail(shot)">
             查看详情
@@ -117,7 +168,20 @@ const handleViewDetail = (screenshot: Screenshot) => {
 
 .actions {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 20px;
+}
+
+.privacy-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.labels-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .screenshot-grid {
@@ -143,12 +207,19 @@ const handleViewDetail = (screenshot: Screenshot) => {
   height: 200px;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .screenshot-preview img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.no-image {
+  color: #64748b;
 }
 
 .sensitive-badge {
@@ -165,6 +236,7 @@ const handleViewDetail = (screenshot: Screenshot) => {
   margin-bottom: 8px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 

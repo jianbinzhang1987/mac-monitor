@@ -420,6 +420,40 @@ async fn disable_proxy(app_handle: tauri::AppHandle) -> Result<String, String> {
     run_vpn_helper_auth("--disable-proxy", app_handle)
 }
 
+#[tauri::command]
+async fn enable_monitoring(app_handle: tauri::AppHandle) -> Result<String, String> {
+    run_vpn_helper_auth("--enable-monitoring", app_handle)
+}
+
+#[tauri::command]
+async fn disable_monitoring(app_handle: tauri::AppHandle) -> Result<String, String> {
+    run_vpn_helper_auth("--disable-monitoring", app_handle)
+}
+
+#[tauri::command]
+async fn set_redaction_status(enabled: bool) -> Result<String, String> {
+    let res_str = send_ipc_command("set_redaction_status", serde_json::json!({ "enabled": enabled })).await?;
+    let res: IpcResponse = serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
+
+    if res.status == "ok" {
+        Ok(res.message)
+    } else {
+        Err(res.message)
+    }
+}
+
+#[tauri::command]
+async fn get_screenshot_logs() -> Result<serde_json::Value, String> {
+    let res_str = send_ipc_command("get_screenshot_logs", serde_json::Value::Null).await?;
+    let res: IpcResponse = serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
+
+    if res.status == "ok" {
+        Ok(res.payload.unwrap_or(serde_json::json!([])))
+    } else {
+        Err(res.message)
+    }
+}
+
 fn main() {
     let app_state = ManagedState(Arc::new(Mutex::new(AppState {
         is_logged_in: false,
@@ -445,15 +479,26 @@ fn main() {
         .manage(app_state)
         .setup(|app| {
             let handle = app.handle().clone();
-            
+
             // Enable AutoSart (OS Login Item)
             let _ = app.autolaunch().enable();
-            
+
+            // Auto-start Monitoring on App Launch
+            tauri::async_runtime::spawn(async move {
+                time::sleep(Duration::from_secs(1)).await;
+                println!("🚀 Auto-enabling Monitoring Service...");
+                match enable_monitoring(handle.clone()).await {
+                    Ok(out) => println!("✅ Monitoring Auto-Enabled: {}", out),
+                    Err(e) => eprintln!("❌ Failed to Auto-Enable Monitoring: {}", e),
+                }
+            });
+
+            let handle = app.handle().clone();
             // Auto-start Proxy on App Launch (User Request)
             // This will prompt for password if not already authorized recently
             tauri::async_runtime::spawn(async move {
                 // Delay slightly to let UI show up first
-                time::sleep(Duration::from_secs(2)).await;
+                time::sleep(Duration::from_secs(3)).await;
                 println!("🚀 Auto-enabling HTTP Proxy...");
                 match enable_proxy(handle.clone()).await {
                     Ok(out) => println!("✅ Proxy Auto-Enabled: {}", out),
@@ -500,23 +545,6 @@ fn main() {
                 })
                 .build(app)?;
 
-            // 启动 AuditService Sidecar
-            match app.shell().sidecar("AuditService") {
-                Ok(command) => {
-                    match command.spawn() {
-                        Ok((mut _rx, _child)) => {
-                            println!("🚀 AuditService Sidecar started successfully");
-                        }
-                        Err(e) => {
-                            eprintln!("❌ Failed to spawn AuditService sidecar: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to find AuditService sidecar: {}", e);
-                }
-            }
-
             start_heartbeat_loop(handle.clone());
             Ok(())
         })
@@ -524,7 +552,9 @@ fn main() {
             register, login, set_device_info, set_audit_policy,
             get_pop_nodes, switch_pop_node, check_for_updates,
             start_vpn, stop_vpn, get_vpn_status,
-            enable_proxy, disable_proxy
+            enable_proxy, disable_proxy,
+            enable_monitoring, disable_monitoring,
+            get_screenshot_logs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

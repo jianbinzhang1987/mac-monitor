@@ -57,6 +57,7 @@ pub struct ScreenshotLog {
     pub host_id: String,
     pub mac: String,
     pub ip: String,
+    pub redaction_labels: Option<String>,
 }
 
 #[derive(Debug, Clone)]

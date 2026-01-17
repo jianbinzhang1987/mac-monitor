@@ -9,11 +9,12 @@ func startAuditServices() {
     print("🛡 Starting Audit Services (non-ES mode)...")
 
     // Initialize Rust Core (Starts Scanner and Sync Service)
+    // Note: Rust Core also starts the IPC server on /tmp/mac_monitor_audit.sock
     rust_init_audit_core()
 
-    // Start IPC Server
+    // Start IPC Server (Disabled in Swift as it's now handled by Rust Core)
     // AuditIPCServer.shared.start()
-    
+
     // Start Screen Capturer (if macOS 12.3+)
     if #available(macOS 12.3, *) {
         ScreenCapturer.shared.start()

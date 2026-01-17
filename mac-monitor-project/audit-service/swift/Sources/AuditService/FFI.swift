@@ -11,7 +11,8 @@ func rust_analyze_enhanced_image(
     _ height: UInt32,
     _ app_name: UnsafePointer<CChar>,
     _ is_sensitive: Bool,
-    _ ocr_text: UnsafePointer<CChar>
+    _ ocr_text: UnsafePointer<CChar>,
+    _ redaction_labels: UnsafePointer<CChar>
 )
 
 @_silgen_name("log_audit_event")
@@ -27,3 +28,11 @@ func rust_register_device(
     _ cpe_id: UnsafePointer<CChar>,
     _ pin: UnsafePointer<CChar>
 ) -> Bool
+
+@_silgen_name("update_redaction_status")
+func rust_update_redaction_status(_ enabled: Bool) {
+    if #available(macOS 12.3, *) {
+        ScreenCapturer.shared.redactionEnabled = enabled
+        print("🛡 Redaction status updated via IPC: \(enabled)")
+    }
+}

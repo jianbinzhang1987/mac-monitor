@@ -253,6 +253,44 @@ impl IpcServer {
                     }
                 }
             }
+            "get_screenshot_logs" => {
+                let db = self.db.clone();
+                let (tx, rx) = std::sync::mpsc::channel();
+
+                self.runtime_handle.spawn(async move {
+                    let result = db.get_unsent_screenshot_logs().await;
+                    let _ = tx.send(result);
+                });
+
+                match rx.recv_timeout(std::time::Duration::from_secs(5)) {
+                    Ok(Ok(logs)) => IpcResponse {
+                        status: "ok".to_string(),
+                        message: "Success".to_string(),
+                        payload: Some(serde_json::to_value(logs).unwrap()),
+                    },
+                    Ok(Err(e)) => IpcResponse { status: "error".to_string(), message: e.to_string(), payload: None },
+                    Err(_) => IpcResponse { status: "error".to_string(), message: "DB query timeout".to_string(), payload: None },
+                }
+            }
+            "set_redaction_status" => {
+                let enabled = cmd.payload["enabled"].as_bool().unwrap_or(true);
+                println!("Updating redaction status via IPC: {}", enabled);
+
+                // Call Swift FFI
+                extern "C" {
+                    fn update_redaction_status(enabled: bool);
+                }
+
+                unsafe {
+                    update_redaction_status(enabled);
+                }
+
+                IpcResponse {
+                    status: "ok".to_string(),
+                    message: format!("Redaction status updated to {}", enabled),
+                    payload: None,
+                }
+            }
             _ => IpcResponse {
                 status: "error".to_string(),
                 message: format!("Unknown command: {}", cmd.command),

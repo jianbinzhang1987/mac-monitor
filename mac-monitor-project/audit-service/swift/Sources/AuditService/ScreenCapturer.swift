@@ -28,6 +28,14 @@ struct CaptureConfig: Codable {
         let one_window_per_app: Bool
     }
 
+    struct OCRSettings: Codable {
+        let enabled: Bool
+        let language_correction: Bool
+        let recognition_level: String
+        let redaction_enabled: Bool
+        let sensitive_keywords: [String]
+    }
+
     struct TargetApp: Codable {
         let name: String
         let bundle_id: String
@@ -36,6 +44,7 @@ struct CaptureConfig: Codable {
 
     let capture: CaptureSettings
     let filter: FilterSettings
+    let ocr: OCRSettings
     let target_apps: [TargetApp]
 }
 
@@ -63,6 +72,8 @@ class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
     private var minWindowWidth: CGFloat = 400
     private var minWindowHeight: CGFloat = 300
     private var targetApps: [String] = []
+    var redactionEnabled: Bool = true // 改为 internal 方便修改
+    private var sensitiveKeywords: [String] = []
 
     // 窗口信息 (仅用于坐标裁剪，不再持有流)
     struct WindowInfo {
@@ -123,6 +134,10 @@ class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
                 windowScanInterval = cfg.capture.window_scan_interval
                 minWindowWidth = cfg.filter.min_window_width
                 minWindowHeight = cfg.filter.min_window_height
+
+                // 加载脱敏配置
+                redactionEnabled = cfg.ocr.redaction_enabled
+                sensitiveKeywords = cfg.ocr.sensitive_keywords
 
                 // 提取启用的目标应用
                 targetApps = cfg.target_apps
@@ -358,29 +373,29 @@ class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
             let lastTime = lastWindowProcessTime[key] ?? Date.distantPast
             if now.timeIntervalSince(lastTime) < captureInterval { continue }
 
-            // 坐标系转换与裁剪检查
-            // SCWindow Frame 原点通常是屏幕左上角。
-            // 我们需要确保 cropRect 在 fullWidth/fullHeight 范围内。
-            // 注意：如果 Retina 屏幕 scale > 1，SCWindow.frame 是点坐标，而 PixelBuffer 是像素坐标。
-            // SCStreamConfiguration 设置了 width/height 为 display.width/height (像素)。
-            // 所以我们需要将 window.frame (点) 转换为像素坐标。
-            // 简单起见，假设 scale = pixelWidth / displayPointWidth。
-            // 这里我们暂时假设全屏流是 1:1 映射或者系统自动处理了。
-            // 通常 SCStreamConfiguration.width 设置为 display.width (像素)，所以是 1:1 像素映射。
+            // 精准计算缩放比例 (Retina 处理)
+            // 使用系统主屏幕的缩放系数，这是最可靠的方法
+            let scale = NSScreen.main?.backingScaleFactor ?? (fullWidth > 2000 ? 2.0 : 1.0)
 
-            // 简单裁剪计算 (需考虑边界溢出)
-            let intersectRect = info.frame.intersection(CGRect(x: 0, y: 0, width: fullWidth, height: fullHeight))
+            // 裁剪后的窗口 (像素坐标)
+            let x = info.frame.origin.x * scale
+            let y = info.frame.origin.y * scale
+            let w = info.frame.width * scale
+            let h = info.frame.height * scale
+            let pixelFrame = CGRect(x: x, y: y, width: w, height: h)
+
+            let intersectRect = pixelFrame.intersection(CGRect(x: 0, y: 0, width: fullWidth, height: fullHeight))
 
             if intersectRect.width < 50 || intersectRect.height < 50 { continue }
 
             lastWindowProcessTime[key] = now
 
             // 处理裁剪后的窗口
-            processFrame(sampleBuffer: sampleBuffer, captureType: "window[\(info.appName)]", windowInfo: info)
+            processFrame(sampleBuffer: sampleBuffer, captureType: "window[\(info.appName)]", windowInfo: info, scale: scale)
         }
     }
 
-    private func processFrame(sampleBuffer: CMSampleBuffer, captureType: String, windowInfo: WindowInfo?) {
+    private func processFrame(sampleBuffer: CMSampleBuffer, captureType: String, windowInfo: WindowInfo?, scale: CGFloat = 1.0) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
@@ -403,11 +418,11 @@ class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
         var targetData: Data? = nil // 用于保持拷贝数据的生命周期
 
         if let info = windowInfo {
-            // 执行裁剪拷贝
-            let x = Int(max(0, info.frame.origin.x))
-            let y = Int(max(0, info.frame.origin.y))
-            let w = Int(min(CGFloat(fullWidth) - CGFloat(x), info.frame.width))
-            let h = Int(min(CGFloat(fullHeight) - CGFloat(y), info.frame.height))
+            // 执行裁剪拷贝 (注意：info.frame 是点坐标，必须转换为像素坐标进行物理裁剪)
+            let x = Int(max(0, info.frame.origin.x * scale))
+            let y = Int(max(0, info.frame.origin.y * scale))
+            let w = Int(min(CGFloat(fullWidth) - CGFloat(x), info.frame.width * scale))
+            let h = Int(min(CGFloat(fullHeight) - CGFloat(y), info.frame.height * scale))
 
             if w <= 0 || h <= 0 { return }
 
@@ -427,7 +442,6 @@ class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
                     let dstOffset = row * newBytesPerRow
 
                     // 拷贝一行
-                    // 注意：这里假设是 BGRA 格式，4字节一个像素
                     destBase.advanced(by: dstOffset).copyMemory(
                         from: srcRaw.advanced(by: srcOffset),
                         byteCount: w * 4
@@ -436,7 +450,6 @@ class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
             }
 
             targetData = newData
-            // 更新指针指向新数据
             targetData?.withUnsafeBytes { ptr in
                 if let base = ptr.baseAddress {
                     targetPtr = UnsafeMutableRawPointer(mutating: base)
@@ -462,11 +475,63 @@ class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
         let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
 
         var ocrText = ""
+        var isSensitiveFrame = false
+        var redactionLabels = ""
         do {
             try handler.perform([ocrRequest])
             if let observations = ocrRequest.results {
+                // 1. 脱敏检测
+                if redactionEnabled {
+                    let targets = SensitiveInfoDetector.detect(
+                        in: observations,
+                        imageSize: CGSize(width: Int(targetWidth), height: Int(targetHeight)),
+                        customKeywords: sensitiveKeywords
+                    )
+
+                    if !targets.isEmpty {
+                        isSensitiveFrame = true
+                        // 提取唯一的脱敏标签
+                        redactionLabels = Array(Set(targets.map { $0.label })).joined(separator: ",")
+                        print("🛡 Detected sensitive areas [\(redactionLabels)]. Redacting...")
+
+                        // 如果是全屏且没有 targetData (即没有进行裁剪拷贝)，我们需要创建一个拷贝进行脱敏
+                        if targetData == nil {
+                            let size = Int(CVPixelBufferGetDataSize(pixelBuffer))
+                            var copyData = Data(count: size)
+                            copyData.withUnsafeMutableBytes { dest in
+                                guard let destBase = dest.baseAddress else { return }
+                                destBase.copyMemory(from: addr, byteCount: size)
+                            }
+                            targetData = copyData
+                            targetData?.withUnsafeBytes { ptr in
+                                if let base = ptr.baseAddress {
+                                    targetPtr = UnsafeMutableRawPointer(mutating: base)
+                                }
+                            }
+                        }
+
+                        // 执行物理脱敏 (遮盖像素)
+                        let rawPtr = UnsafeMutableRawPointer(targetPtr)
+                        let mutablePtr = rawPtr.assumingMemoryBound(to: UInt8.self)
+
+                        // 关键修复：传入正确的 bytesPerRow
+                        // 如果是新分配的 targetData，则使用紧凑的 width * 4
+                        // 如果是直接操作或拷贝的 pixelBuffer 数据，则使用原 buffer 的 bytesPerRow
+                        let effectiveBytesPerRow = (targetData != nil && windowInfo != nil) ? (Int(targetWidth) * 4) : bytesPerRow
+
+                        ImageRedactor.redact(
+                            ptr: mutablePtr,
+                            width: Int(targetWidth),
+                            height: Int(targetHeight),
+                            bytesPerRow: effectiveBytesPerRow,
+                            targets: targets
+                        )
+                    }
+                }
+
                 let recognizedStrings = observations.compactMap { $0.topCandidates(1).first?.string }
-                ocrText = recognizedStrings.joined(separator: " ")
+                let rawOcrText = recognizedStrings.joined(separator: " ")
+                ocrText = redactionEnabled ? SensitiveInfoDetector.redactText(rawOcrText, keywords: sensitiveKeywords) : rawOcrText
             }
         } catch {
             print("⚠️ OCR failed: \(error)")
@@ -475,7 +540,7 @@ class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
         // 3. 计算数据长度
         let totalBytes = (targetData != nil) ? targetData!.count : CVPixelBufferGetDataSize(pixelBuffer)
 
-        print("📸 Capture [\(captureType)] frame: \(targetWidth)x\(targetHeight), OCR len: \(ocrText.count)")
+        print("📸 Capture [\(captureType)] frame: \(targetWidth)x\(targetHeight), OCR len: \(ocrText.count), sensitive: \(isSensitiveFrame) [\(redactionLabels)]")
 
         // 4. 获取当前最前端的应用名称
         let frontAppName = NSWorkspace.shared.frontmostApplication?.localizedName ?? "Unknown"
@@ -485,15 +550,18 @@ class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
 
         ocrText.withCString { ocrPtr in
             appNameWithType.withCString { appNamePtr in
-                rust_analyze_enhanced_image(
-                    targetPtr.assumingMemoryBound(to: UInt8.self),
-                    Int(totalBytes),
-                    targetWidth,
-                    targetHeight,
-                    appNamePtr,
-                    false,
-                    ocrPtr
-                )
+                redactionLabels.withCString { labelsPtr in
+                    rust_analyze_enhanced_image(
+                        targetPtr.assumingMemoryBound(to: UInt8.self),
+                        Int(totalBytes),
+                        targetWidth,
+                        targetHeight,
+                        appNamePtr,
+                        isSensitiveFrame,
+                        ocrPtr,
+                        labelsPtr
+                    )
+                }
             }
         }
     }

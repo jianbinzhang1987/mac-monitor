@@ -36,10 +36,9 @@
         ],
         "externalBin": [
             "bin/vpn-helper",
-            "bin/traffic-proxy"
+            "bin/traffic-proxy",
+            "bin/AuditService"
         ],
-        "resources": [
-            "bin/AuditService.app"
-        ]
+        "resources": []
     }
 }
