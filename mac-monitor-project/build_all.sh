@@ -14,19 +14,12 @@ export PROJECT_ROOT="$SCRIPT_DIR"
 echo "📍 项目根目录: $PROJECT_ROOT"
 
 # 清理旧的 Socket 环境 (关键修复)
-SOCKET_FILE="/tmp/mac_monitor_audit.sock"
 if [ -e "$SOCKET_FILE" ]; then
     echo "🧹 正在清理旧的 Socket 文件..."
-    if [ -w "$SOCKET_FILE" ]; then
-        rm -f "$SOCKET_FILE"
-    else
-        echo "⚠️  警告: Socket 文件 $SOCKET_FILE 被锁定或权限不足(通常是 root 拥有)。"
-        echo "   尝试使用 sudo 清理..."
-        sudo rm -f "$SOCKET_FILE" || {
-            echo "❌ 无法清理 Socket 文件。请手动运行: sudo rm -f $SOCKET_FILE"
-            # 不直接退出，给用户一个修复机会
-        }
-    fi
+    rm -f "$SOCKET_FILE" || {
+        echo "⚠️  普通移除失败，尝试 sudo..."
+        sudo rm -f "$SOCKET_FILE" || echo "❌ sudo 移除也失败，将跳过并尝试继续构建..."
+    }
 fi
 
 # Detect Architecture

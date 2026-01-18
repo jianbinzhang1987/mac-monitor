@@ -550,6 +550,39 @@ fn run_vpn_helper_auth_combined(handle: tauri::AppHandle) -> Result<String, Stri
     }
 }
 
+// Combined function to disable both monitoring and proxy in a single sudo prompt
+fn run_vpn_helper_auth_combined_disable(handle: tauri::AppHandle) -> Result<String, String> {
+    let sidecar_path = std::env::current_exe()
+        .map_err(|e| e.to_string())?
+        .parent()
+        .unwrap()
+        .join("vpn-helper");
+
+    let helper_path = sidecar_path.to_string_lossy().to_string();
+    
+    // Run both commands in a single script with one sudo prompt
+    // We use '&' combined with output redirection to make it asynchronous (fire & forget)
+    // The osascript will return immediately after authentication
+    let script = format!(
+        "do shell script \"('{0}' --disable-proxy; '{0}' --disable-monitoring) >/dev/null 2>&1 &\" with administrator privileges",
+        helper_path
+    );
+
+    println!("🔑 Requesting privilege for combined disable operations...");
+
+    let output = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
 #[tauri::command]
 async fn enable_proxy(app_handle: tauri::AppHandle) -> Result<String, String> {
     // Invoke vpn-helper --enable-proxy with admin privs
@@ -630,6 +663,12 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![])))
         .manage(app_state)
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.minimize();
+                api.prevent_close();
+            }
+        })
         .setup(|app| {
             let handle = app.handle().clone();
 
@@ -661,7 +700,23 @@ fn main() {
                 .on_menu_event(|app: &tauri::AppHandle, event| {
                     match event.id.as_ref() {
                         "quit" => {
-                            app.exit(0);
+                            let app_handle = app.app_handle().clone();
+                            tauri::async_runtime::spawn(async move {
+                                // 1. Hide the window immediately so user feels "Exited"
+                                if let Some(window) = app_handle.get_webview_window("main") {
+                                    println!("🙈 Hiding window immediately...");
+                                    let _ = window.hide(); 
+                                }
+
+                                println!("🛑 User requested Exit. Stopping services...");
+                                
+                                // Call the combined disable function (single sudo prompt)
+                                let _ = run_vpn_helper_auth_combined_disable(app_handle.clone());
+                                
+                                // Quit the app after services stopped
+                                println!("👋 Quitting application...");
+                                app_handle.exit(0);
+                            });
                         }
                         "show" => {
                             if let Some(window) = app.get_webview_window("main") {
